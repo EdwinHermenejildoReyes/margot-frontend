@@ -12,6 +12,7 @@ import {
   ChefHat,
   Package,
   SprayCanIcon,
+  BarChart3,
   LogOut,
   Menu,
   X,
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Mesas", href: "/dashboard/mesas", icon: Armchair },
   { name: "Cocina", href: "/dashboard/cocina", icon: ChefHat },
   { name: "Inventario", href: "/dashboard/inventario", icon: Package },
+  { name: "Estadísticas", href: "/dashboard/estadisticas", icon: BarChart3 },
   { name: "Limpieza", href: "/dashboard/limpieza", icon: SprayCanIcon },
 ];
 
