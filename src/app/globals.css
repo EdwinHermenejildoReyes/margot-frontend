@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* ─── Margot Brand Theme ─── */
+@theme {
+  /* Primary gold */
+  --color-brand-gold: #CC9910;
+  --color-brand-gold-light: #e6b84d;
+  --color-brand-gold-dark: #C37C13;
+
+  /* Bronze / accent */
+  --color-brand-bronze: #C37C13;
+  --color-brand-bronze-light: #d99a3a;
+  --color-brand-bronze-dark: #a56610;
+
+  /* Sage green (soft backgrounds) */
+  --color-brand-sage: #D7E0D9;
+  --color-brand-sage-light: #edf1ee;
+  --color-brand-sage-dark: #b8c4bb;
+
+  /* Dark charcoal */
+  --color-brand-dark: #2F353B;
+  --color-brand-dark-light: #3d454d;
+  --color-brand-dark-deep: #232930;
+
+  /* Font family */
+  --font-poppins: "Poppins", system-ui, sans-serif;
+}
+
+:root {
+  --background: #f9fafb;
+  --foreground: #2F353B;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #b8c4bb; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #8a9a8e; }

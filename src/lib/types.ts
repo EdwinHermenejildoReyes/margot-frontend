@@ -1,0 +1,216 @@
+// ── Auth ──
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  tipo_usuario: "cliente" | "comercio" | "repartidor";
+  telefono?: string;
+  direccion?: string;
+  foto_perfil?: string;
+  is_staff: boolean;
+  is_active: boolean;
+}
+
+export interface TokenPair {
+  access: string;
+  refresh: string;
+}
+
+// ── Menu ──
+export interface Category {
+  id: number;
+  name: string;
+  description?: string;
+  order: number;
+  image?: string;
+  items_count?: number;
+}
+
+export interface Section {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+export interface MenuItem {
+  id: number;
+  category: number;
+  category_name?: string;
+  section?: number;
+  section_name?: string;
+  name: string;
+  description?: string;
+  price: string;
+  image?: string;
+  is_available: boolean;
+  is_featured: boolean;
+  preparation_time?: number;
+  calories?: number;
+  order: number;
+}
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  description?: string;
+  is_allergen: boolean;
+}
+
+// ── Pedidos ──
+export interface Pedido {
+  id: number;
+  numero_pedido: string;
+  cliente?: number;
+  comercio?: number;
+  mesa?: number;
+  mesa_numero?: number;
+  atencion?: number;
+  estado: string;
+  tipo_entrega: string;
+  subtotal: string;
+  impuestos: string;
+  descuento: string;
+  total: string;
+  notas?: string;
+  created_at: string;
+  detalles?: PedidoDetalle[];
+}
+
+export interface PedidoDetalle {
+  id: number;
+  menu_item: number;
+  menu_item_nombre?: string;
+  cantidad: number;
+  precio_unitario: string;
+  subtotal: string;
+  notas?: string;
+}
+
+// ── Mesas & Atención ──
+export interface Mesa {
+  id: number;
+  numero: number;
+  capacidad: number;
+  estado: string;
+  ubicacion: string;
+  pos_x?: number;
+  pos_y?: number;
+}
+
+export interface Atencion {
+  id: number;
+  numero_atencion: string;
+  mesa: number;
+  mesa_numero?: number;
+  mesero?: number;
+  mesero_nombre?: string;
+  numero_comensales: number;
+  estado: string;
+  hora_llegada: string;
+  notas?: string;
+}
+
+// ── Cocina / Comandas ──
+export interface ComandaCocina {
+  id: number;
+  atencion?: number;
+  mesa_numero?: number;
+  pedido?: number;
+  pedido_numero?: string;
+  numero_comanda?: string;
+  seccion_destino?: number;
+  seccion_nombre?: string;
+  estado: string;
+  prioridad: string;
+  hora_enviada: string;
+  hora_inicio_preparacion?: string;
+  hora_listo?: string;
+  hora_servido?: string;
+  notas_cocina?: string;
+  total_items?: number;
+  detalles?: ComandaDetalle[];
+}
+
+export interface ComandaDetalle {
+  id: number;
+  comanda: number;
+  menu_item: number;
+  menu_item_name?: string;
+  cantidad: number;
+  estado: string;
+  notas?: string;
+}
+
+// ── Inventario ──
+export interface InventarioItem {
+  id: number;
+  nombre: string;
+  categoria_insumo?: number;
+  categoria_nombre?: string;
+  unidad_medida?: number;
+  unidad_abreviatura?: string;
+  stock_actual: string;
+  stock_minimo: string;
+  costo_unitario: string;
+  perecedero: boolean;
+  fecha_vencimiento?: string;
+  proveedor_principal?: number;
+  proveedor_nombre?: string;
+  alerta_stock?: boolean;
+}
+
+export interface MovimientoInventario {
+  id: number;
+  insumo: number;
+  insumo_nombre?: string;
+  tipo: "entrada" | "salida" | "ajuste";
+  cantidad: string;
+  fecha: string;
+  notas?: string;
+}
+
+// ── Limpieza ──
+export interface AreaLimpieza {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  prioridad: string;
+}
+
+export interface ProtocoloLimpieza {
+  id: number;
+  nombre: string;
+  area?: number;
+  area_nombre?: string;
+  frecuencia: string;
+  tipo_limpieza: string;
+  duracion_estimada?: number;
+}
+
+export interface ProgramaLimpieza {
+  id: number;
+  nombre?: string;
+  turno: string;
+  dia: string;
+}
+
+export interface RegistroLimpieza {
+  id: number;
+  programa: number;
+  protocolo: number;
+  estado: string;
+  fecha: string;
+  hora_inicio?: string;
+  hora_fin?: string;
+  observaciones?: string;
+}
+
+// ── Paginated Response ──
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
