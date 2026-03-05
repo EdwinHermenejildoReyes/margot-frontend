@@ -207,6 +207,27 @@ export interface RegistroLimpieza {
   observaciones?: string;
 }
 
+// ── Alertas ──
+export interface AlertaStockBajo {
+  id: number;
+  insumo: number;
+  insumo_nombre: string;
+  unidad: string;
+  tipo: "stock_bajo" | "sin_stock";
+  tipo_display: string;
+  stock_al_momento: string;
+  stock_minimo: string;
+  mensaje: string;
+  leida: boolean;
+  resuelta: boolean;
+  created_at: string;
+}
+
+export interface AlertasNoLeidasResponse {
+  count: number;
+  alertas: AlertaStockBajo[];
+}
+
 // ── Paginated Response ──
 export interface PaginatedResponse<T> {
   count: number;
