@@ -8,6 +8,9 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { ShoppingCart, Search, ChevronLeft, ChevronRight, Eye, Plus } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import StockInsuficienteModal, {
+  type StockErrorResponse,
+} from "@/components/StockInsuficienteModal";
 
 const ESTADOS = [
   { value: "", label: "Todos" },
@@ -27,6 +30,7 @@ export default function PedidosPage() {
   const [estado, setEstado] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
 
   const fetchPedidos = useCallback(async () => {
     setLoading(true);
@@ -51,8 +55,16 @@ export default function PedidosPage() {
       await api.post(`/pedidos/${id}/${action}/`);
       toast.success(`Pedido ${action} exitosamente`);
       fetchPedidos();
-    } catch {
-      toast.error(`Error al ${action} el pedido`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: StockErrorResponse } };
+      if (
+        axiosErr.response?.status === 409 &&
+        axiosErr.response.data?.error === "stock_insuficiente"
+      ) {
+        setStockError(axiosErr.response.data);
+      } else {
+        toast.error(`Error al ${action} el pedido`);
+      }
     }
   };
 
@@ -189,6 +201,14 @@ export default function PedidosPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ═══ STOCK INSUFICIENTE MODAL ═══ */}
+      {stockError && (
+        <StockInsuficienteModal
+          data={stockError}
+          onClose={() => setStockError(null)}
+        />
       )}
 
       {/* Pagination */}

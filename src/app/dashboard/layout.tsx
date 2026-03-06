@@ -1,22 +1,30 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { isInternal, canAccessRoute } from "@/lib/permissions";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user, router]);
+    if (loading) return;
+    // No logueado → login
+    if (!user) { router.push("/login"); return; }
+    // No es personal interno → login
+    if (!isInternal(user)) { router.push("/login"); return; }
+    // No tiene acceso a esta ruta → dashboard principal
+    if (!canAccessRoute(user, pathname)) { router.push("/dashboard"); return; }
+  }, [loading, user, router, pathname]);
 
   if (loading) return <LoadingSpinner className="min-h-screen" />;
-  if (!user) return null;
+  if (!user || !isInternal(user)) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">

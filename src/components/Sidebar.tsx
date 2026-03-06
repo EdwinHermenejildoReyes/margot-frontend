@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { ROLE_ROUTES, TIPO_LABELS } from "@/lib/permissions";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -13,6 +14,7 @@ import {
   Package,
   SprayCanIcon,
   BarChart3,
+  Calculator,
   LogOut,
   Menu,
   X,
@@ -27,6 +29,7 @@ const navigation = [
   { name: "Mesas", href: "/dashboard/mesas", icon: Armchair },
   { name: "Cocina", href: "/dashboard/cocina", icon: ChefHat },
   { name: "Inventario", href: "/dashboard/inventario", icon: Package },
+  { name: "Costeo", href: "/dashboard/costeo", icon: Calculator },
   { name: "Estadísticas", href: "/dashboard/estadisticas", icon: BarChart3 },
   { name: "Limpieza", href: "/dashboard/limpieza", icon: SprayCanIcon },
 ];
@@ -36,7 +39,17 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const NavContent = () => (
+  const NavContent = () => {
+    // Filtrar navegación según tipo_usuario
+    const allowedNav = navigation.filter((item) => {
+      if (user?.is_staff) return true;
+      const routes = ROLE_ROUTES[user?.tipo_usuario || "cliente"] || [];
+      return routes.some(
+        (r) => item.href === r || item.href.startsWith(r + "/")
+      );
+    });
+
+    return (
     <>
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-brand-bronze/20">
@@ -52,7 +65,7 @@ export default function Sidebar() {
 
       {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navigation.map((item) => {
+        {allowedNav.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
@@ -83,7 +96,10 @@ export default function Sidebar() {
             <p className="text-sm font-medium text-white truncate">
               {user?.first_name} {user?.last_name}
             </p>
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            <p className="text-xs text-gray-400 truncate">
+              {TIPO_LABELS[user?.tipo_usuario || "cliente"]}
+              {user?.is_staff && " · Staff"}
+            </p>
           </div>
         </div>
         <button
@@ -95,7 +111,8 @@ export default function Sidebar() {
         </button>
       </div>
     </>
-  );
+    );
+  };
 
   return (
     <>

@@ -1,11 +1,13 @@
 // ── Auth ──
+export type TipoUsuario = "comercio" | "mesero" | "cocinero" | "cajero" | "cliente" | "repartidor";
+
 export interface User {
   id: number;
   username: string;
   email: string;
   first_name: string;
   last_name: string;
-  tipo_usuario: "cliente" | "comercio" | "repartidor";
+  tipo_usuario: TipoUsuario;
   telefono?: string;
   direccion?: string;
   foto_perfil?: string;
@@ -234,4 +236,56 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
+}
+
+// ── Costeo de Recetas ──
+export interface CosteoIngrediente {
+  id?: number;
+  insumo?: number | null;
+  insumo_nombre?: string;
+  nombre: string;
+  costo_unitario: number | string;
+  cantidad: number | string;
+  unidad: string;
+  total?: number | string;
+}
+
+export interface CostoExtra {
+  id?: number;
+  concepto: string;
+  monto: number | string;
+}
+
+export interface CosteoRecetaList {
+  id: number;
+  nombre: string;
+  porciones: number;
+  porcentaje_utilidad: string;
+  porcentaje_costo_fijo: string;
+  total_ingredientes: string;
+  total_extras: string;
+  costo_total: string;
+  precio_venta: string;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface CosteoRecetaDetail {
+  id: number;
+  nombre: string;
+  porciones: number;
+  porcentaje_utilidad: string;
+  porcentaje_costo_fijo: string;
+  notas: string;
+  ingredientes: CosteoIngrediente[];
+  extras: CostoExtra[];
+  total_ingredientes: string;
+  total_extras: string;
+  costo_total: string;
+  costo_fijo: string;
+  costo_total_con_fijo: string;
+  costo_por_porcion: string;
+  precio_venta: string;
+  updated_at: string;
+  created_at: string;
 }

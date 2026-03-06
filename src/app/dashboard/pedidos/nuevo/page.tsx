@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
+import StockInsuficienteModal, {
+  type StockErrorResponse,
+  type FaltantePorProducto,
+} from "@/components/StockInsuficienteModal";
 
 /* ── Cart item type ── */
 interface CartItem {
@@ -56,6 +60,10 @@ export default function NuevoPedidoPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showNotesFor, setShowNotesFor] = useState<number | null>(null);
+
+  /* ── Stock check ── */
+  const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
+  const [stockWarnings, setStockWarnings] = useState<Map<number, number>>(new Map()); // menuItemId → porciones_posibles
 
   /* ── Fetch data ── */
   useEffect(() => {
@@ -117,9 +125,45 @@ export default function NuevoPedidoPage() {
   );
 
   /* ── Cart helpers ── */
-  const addToCart = (item: MenuItem) => {
+  const addToCart = async (item: MenuItem) => {
+    const existing = cart.find((c) => c.menuItem.id === item.id);
+    const newCantidad = existing ? existing.cantidad + 1 : 1;
+
+    // Check stock availability
+    try {
+      const { data } = await api.get(
+        `/menu-items/${item.id}/verificar_stock/?cantidad=${newCantidad}`
+      );
+
+      if (!data.disponible) {
+        // Build the modal data
+        const faltante: FaltantePorProducto = {
+          producto: data.producto,
+          cantidad_pedida: data.cantidad_pedida,
+          porciones_posibles: data.porciones_posibles,
+          ingredientes_faltantes: data.ingredientes_faltantes,
+        };
+        setStockError({
+          error: "stock_insuficiente",
+          message: `Stock insuficiente para ${item.name}`,
+          faltantes: [faltante],
+        });
+        // Track the warning so the card shows a badge
+        setStockWarnings((prev) => new Map(prev).set(item.id, data.porciones_posibles));
+        return; // Don't add to cart
+      }
+
+      // Clear warning if resolved
+      setStockWarnings((prev) => {
+        const next = new Map(prev);
+        next.delete(item.id);
+        return next;
+      });
+    } catch {
+      // If check fails, allow adding (don't block the workflow)
+    }
+
     setCart((prev) => {
-      const existing = prev.find((c) => c.menuItem.id === item.id);
       if (existing) {
         return prev.map((c) =>
           c.menuItem.id === item.id ? { ...c, cantidad: c.cantidad + 1 } : c
@@ -332,6 +376,14 @@ export default function NuevoPedidoPage() {
                               {inCart.cantidad}
                             </span>
                           )}
+                          {stockWarnings.has(item.id) && (
+                            <span
+                              className="absolute -bottom-1 -right-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold border border-amber-200 shadow-sm"
+                              title={`Máximo ${stockWarnings.get(item.id)} porciones con stock actual`}
+                            >
+                              máx {stockWarnings.get(item.id)}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -538,6 +590,14 @@ export default function NuevoPedidoPage() {
           </button>
         </div>
       </div>
+
+      {/* ═══ STOCK INSUFICIENTE MODAL ═══ */}
+      {stockError && (
+        <StockInsuficienteModal
+          data={stockError}
+          onClose={() => setStockError(null)}
+        />
+      )}
     </div>
   );
 }

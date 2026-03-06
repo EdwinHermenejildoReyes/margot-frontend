@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Bell, Search, AlertTriangle, PackageX, Check, CheckCheck, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { canViewAlerts, TIPO_LABELS } from "@/lib/permissions";
 import api from "@/lib/api";
 import type { AlertaStockBajo, AlertasNoLeidasResponse } from "@/lib/types";
 import clsx from "clsx";
@@ -30,7 +31,7 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!user?.is_staff) return;
+    if (!canViewAlerts(user)) return;
     fetchAlertas();
     const interval = setInterval(fetchAlertas, 30_000); // Poll every 30s
     return () => clearInterval(interval);
@@ -81,7 +82,7 @@ export default function Navbar() {
 
       <div className="flex items-center gap-4">
         {/* ── Notification bell ── */}
-        {user?.is_staff && (
+        {canViewAlerts(user) && (
           <div className="relative" ref={panelRef}>
             <button
               onClick={() => setOpen((v) => !v)}
@@ -208,7 +209,7 @@ export default function Navbar() {
             {user?.first_name || user?.username}
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-brand-sage text-brand-bronze font-medium">
-            {user?.is_staff ? "Admin" : user?.tipo_usuario}
+            {user?.is_staff ? "Staff" : TIPO_LABELS[user?.tipo_usuario || "cliente"]}
           </span>
         </div>
       </div>

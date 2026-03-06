@@ -22,6 +22,9 @@ import {
   StickyNote,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import StockInsuficienteModal, {
+  type StockErrorResponse,
+} from "@/components/StockInsuficienteModal";
 
 /* ── Interfaces ── */
 
@@ -90,6 +93,7 @@ export default function PedidoDetailPage() {
   const [menuCategory, setMenuCategory] = useState<number | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
   const [notesOpenFor, setNotesOpenFor] = useState<number | null>(null);
+  const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
 
   /* ── Fetch pedido ── */
   const fetchPedido = async () => {
@@ -115,8 +119,16 @@ export default function PedidoDetailPage() {
       await api.post(`/pedidos/${params.id}/${action}/`);
       toast.success(`Pedido ${action} exitosamente`);
       fetchPedido();
-    } catch {
-      toast.error(`Error al ${action} el pedido`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: StockErrorResponse } };
+      if (
+        axiosErr.response?.status === 409 &&
+        axiosErr.response.data?.error === "stock_insuficiente"
+      ) {
+        setStockError(axiosErr.response.data);
+      } else {
+        toast.error(`Error al ${action} el pedido`);
+      }
     }
   };
 
@@ -564,6 +576,14 @@ export default function PedidoDetailPage() {
           )}
         </div>
       </div>
+
+      {/* ═══ STOCK INSUFICIENTE MODAL ═══ */}
+      {stockError && (
+        <StockInsuficienteModal
+          data={stockError}
+          onClose={() => setStockError(null)}
+        />
+      )}
 
       {/* ═══ ADD ITEM MODAL ═══ */}
       {showAddModal && (
