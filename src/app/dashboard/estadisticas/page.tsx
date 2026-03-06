@@ -133,12 +133,12 @@ export default function EstadisticasPage() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Estadísticas de Productos</h1>
-          <p className="text-sm text-gray-500 mt-1">Productos más vendidos por cantidad y por ingresos</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Estadísticas de Productos</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">Productos más vendidos por cantidad y por ingresos</p>
         </div>
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-brand-gold" />
@@ -204,7 +204,7 @@ export default function EstadisticasPage() {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <SummaryCard
               title="Total Pedidos"
               value={data.resumen.total_pedidos.toLocaleString("es-ES")}
@@ -380,13 +380,13 @@ function SummaryCard({ title, value, icon: Icon, color }: {
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
-      <div className={`h-12 w-12 rounded-xl ${color} flex items-center justify-center flex-shrink-0`}>
-        <Icon className="h-6 w-6 text-white" />
+    <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-5 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
+      <div className={`h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl ${color} flex items-center justify-center flex-shrink-0`}>
+        <Icon className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
       </div>
-      <div>
-        <p className="text-sm text-gray-500">{title}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
+      <div className="text-center sm:text-left">
+        <p className="text-[10px] sm:text-sm text-gray-500">{title}</p>
+        <p className="text-base sm:text-2xl font-bold text-gray-900">{value}</p>
       </div>
     </div>
   );

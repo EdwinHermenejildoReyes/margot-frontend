@@ -35,6 +35,7 @@ function formatTime(iso: string | null) {
   return new Date(iso).toLocaleTimeString("es-EC", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 
@@ -377,35 +378,35 @@ export default function AsistenciaPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Control de Asistencia</h1>
-        <p className="text-gray-500 mt-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Control de Asistencia</h1>
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">
           Registro de entrada y salida con validación de ubicación
         </p>
       </div>
 
       {/* Alerts */}
       {actionSuccess && (
-        <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg">
-          <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
-          <span>{actionSuccess}</span>
-          <button onClick={() => setActionSuccess(null)} className="ml-auto">
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm">
+          <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+          <span className="flex-1">{actionSuccess}</span>
+          <button onClick={() => setActionSuccess(null)} className="ml-auto flex-shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
       {(actionError || geoError) && (
-        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
-          <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-          <span>{actionError || geoError}</span>
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm">
+          <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+          <span className="flex-1">{actionError || geoError}</span>
           <button
             onClick={() => {
               setActionError(null);
               setGeoError(null);
             }}
-            className="ml-auto"
+            className="ml-auto flex-shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
@@ -413,19 +414,19 @@ export default function AsistenciaPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg overflow-x-auto no-scrollbar">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={clsx(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
+              "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap",
               tab === t.key
                 ? "bg-brand-gold text-white shadow"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-200"
             )}
           >
-            <t.icon className="h-4 w-4" />
+            <t.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             {t.label}
           </button>
         ))}
@@ -433,17 +434,18 @@ export default function AsistenciaPage() {
 
       {/* ════════════════════════════════════════ TAB: RELOJ ═══════ */}
       {tab === "reloj" && (
-        <div className="flex flex-col items-center gap-8">
+        <div className="flex flex-col items-center gap-5 sm:gap-8">
           {/* Reloj digital */}
           <div className="text-center">
-            <p className="text-6xl font-mono font-bold text-gray-900 tracking-wider">
+            <p className="text-4xl sm:text-6xl font-mono font-bold text-gray-900 tracking-wider">
               {clock.toLocaleTimeString("es-EC", {
                 hour: "2-digit",
                 minute: "2-digit",
                 second: "2-digit",
+                hour12: false,
               })}
             </p>
-            <p className="text-gray-500 mt-2">
+            <p className="text-gray-500 text-sm sm:text-base mt-1 sm:mt-2">
               {clock.toLocaleDateString("es-EC", {
                 weekday: "long",
                 day: "numeric",
@@ -456,7 +458,7 @@ export default function AsistenciaPage() {
           {/* Estado actual */}
           <div
             className={clsx(
-              "w-full max-w-md rounded-2xl p-6 text-center border",
+              "w-full max-w-md rounded-2xl p-4 sm:p-6 text-center border",
               enTurno
                 ? "bg-green-50 border-green-300"
                 : "bg-gray-50 border-gray-200"
@@ -464,25 +466,25 @@ export default function AsistenciaPage() {
           >
             {enTurno ? (
               <>
-                <div className="flex items-center justify-center gap-2 text-green-400 mb-3">
+                <div className="flex items-center justify-center gap-2 text-green-600 mb-2 sm:mb-3">
                   <span className="relative flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
                   </span>
-                  <span className="font-semibold text-lg">En turno</span>
+                  <span className="font-semibold text-base sm:text-lg">En turno</span>
                 </div>
-                <p className="text-4xl font-mono font-bold text-gray-900 mb-2">
+                <p className="text-3xl sm:text-4xl font-mono font-bold text-gray-900 mb-1 sm:mb-2">
                   {elapsed}
                 </p>
-                <p className="text-gray-500 text-sm">
+                <p className="text-gray-500 text-xs sm:text-sm">
                   Entrada: {formatTime(turnoActual?.hora_entrada || null)}
                 </p>
               </>
             ) : (
               <div className="text-gray-500">
-                <Timer className="h-12 w-12 mx-auto mb-3 opacity-40" />
-                <p className="text-lg">Sin turno activo</p>
-                <p className="text-sm mt-1">Registra tu entrada para iniciar</p>
+                <Timer className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 opacity-40" />
+                <p className="text-base sm:text-lg">Sin turno activo</p>
+                <p className="text-xs sm:text-sm mt-1">Registra tu entrada para iniciar</p>
               </div>
             )}
           </div>
@@ -492,7 +494,7 @@ export default function AsistenciaPage() {
             onClick={enTurno ? handleSalida : handleEntrada}
             disabled={actionLoading}
             className={clsx(
-              "flex items-center gap-3 px-8 py-4 rounded-2xl text-lg font-bold transition-all shadow-lg",
+              "flex items-center gap-2 sm:gap-3 px-6 py-3 sm:px-8 sm:py-4 rounded-2xl text-base sm:text-lg font-bold transition-all shadow-lg w-full sm:w-auto justify-center",
               "disabled:opacity-50 disabled:cursor-not-allowed",
               enTurno
                 ? "bg-red-600 hover:bg-red-700 text-white"
@@ -500,11 +502,11 @@ export default function AsistenciaPage() {
             )}
           >
             {actionLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" />
             ) : enTurno ? (
-              <LogOut className="h-6 w-6" />
+              <LogOut className="h-5 w-5 sm:h-6 sm:w-6" />
             ) : (
-              <LogIn className="h-6 w-6" />
+              <LogIn className="h-5 w-5 sm:h-6 sm:w-6" />
             )}
             {actionLoading
               ? "Verificando ubicación..."
@@ -513,8 +515,8 @@ export default function AsistenciaPage() {
               : "Registrar Entrada"}
           </button>
 
-          <p className="text-xs text-gray-400 flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
+          <p className="text-[11px] sm:text-xs text-gray-400 flex items-center gap-1 text-center">
+            <MapPin className="h-3 w-3 flex-shrink-0" />
             Se validará tu ubicación GPS para confirmar que estás en el local
           </p>
         </div>
@@ -544,24 +546,24 @@ export default function AsistenciaPage() {
 
           {/* Summary cards */}
           {resumen && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
-                <p className="text-3xl font-bold text-brand-gold">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center border border-gray-200">
+                <p className="text-2xl sm:text-3xl font-bold text-brand-gold">
                   {resumen.total_horas}h
                 </p>
-                <p className="text-gray-500 text-sm mt-1">Horas totales</p>
+                <p className="text-gray-500 text-xs sm:text-sm mt-1">Horas totales</p>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
-                <p className="text-3xl font-bold text-brand-gold">
+              <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center border border-gray-200">
+                <p className="text-2xl sm:text-3xl font-bold text-brand-gold">
                   {resumen.dias_trabajados}
                 </p>
-                <p className="text-gray-500 text-sm mt-1">Días trabajados</p>
+                <p className="text-gray-500 text-xs sm:text-sm mt-1">Días trabajados</p>
               </div>
             </div>
           )}
 
-          {/* Records table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {/* Records — desktop table */}
+          <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -586,35 +588,20 @@ export default function AsistenciaPage() {
                       key={r.id}
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      <td className="px-4 py-3 text-gray-900">
-                        {formatDate(r.fecha)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {formatTime(r.hora_entrada)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {formatTime(r.hora_salida)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-900 font-mono">
-                        {r.horas_trabajadas_display}
-                      </td>
+                      <td className="px-4 py-3 text-gray-900">{formatDate(r.fecha)}</td>
+                      <td className="px-4 py-3 text-gray-600">{formatTime(r.hora_entrada)}</td>
+                      <td className="px-4 py-3 text-gray-600">{formatTime(r.hora_salida)}</td>
+                      <td className="px-4 py-3 text-gray-900 font-mono">{r.horas_trabajadas_display}</td>
                       <td className="px-4 py-3">
                         <span
                           className={clsx(
                             "px-2 py-0.5 rounded-full text-xs font-medium",
-                            r.estado === "completado" &&
-                              "bg-green-500/20 text-green-400",
-                            r.estado === "en_turno" &&
-                              "bg-blue-500/20 text-blue-400",
-                            r.estado === "irregular" &&
-                              "bg-red-500/20 text-red-400"
+                            r.estado === "completado" && "bg-green-100 text-green-700",
+                            r.estado === "en_turno" && "bg-blue-100 text-blue-700",
+                            r.estado === "irregular" && "bg-red-100 text-red-700"
                           )}
                         >
-                          {r.estado === "completado"
-                            ? "Completado"
-                            : r.estado === "en_turno"
-                            ? "En turno"
-                            : "Irregular"}
+                          {r.estado === "completado" ? "Completado" : r.estado === "en_turno" ? "En turno" : "Irregular"}
                         </span>
                       </td>
                     </tr>
@@ -622,6 +609,45 @@ export default function AsistenciaPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Records — mobile cards */}
+          <div className="sm:hidden space-y-2">
+            {resumen?.registros?.length === 0 && (
+              <p className="text-center text-gray-400 py-8 text-sm">Sin registros este mes</p>
+            )}
+            {resumen?.registros?.map((r) => (
+              <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-medium text-gray-900">{formatDate(r.fecha)}</span>
+                  <span
+                    className={clsx(
+                      "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                      r.estado === "completado" && "bg-green-100 text-green-700",
+                      r.estado === "en_turno" && "bg-blue-100 text-blue-700",
+                      r.estado === "irregular" && "bg-red-100 text-red-700"
+                    )}
+                  >
+                    {r.estado === "completado" ? "Completado" : r.estado === "en_turno" ? "En turno" : "Irregular"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <LogIn className="h-3 w-3 text-green-500" />
+                      {formatTime(r.hora_entrada)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <LogOut className="h-3 w-3 text-red-400" />
+                      {formatTime(r.hora_salida)}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-gray-900 text-sm">
+                    {r.horas_trabajadas_display || "—"}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -652,8 +678,8 @@ export default function AsistenciaPage() {
             </button>
           </div>
 
-          {/* Team table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {/* Team — desktop table */}
+          <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -667,37 +693,22 @@ export default function AsistenciaPage() {
                 <tbody>
                   {equipo.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="text-center text-gray-500 py-8">
-                        Sin datos este mes
-                      </td>
+                      <td colSpan={4} className="text-center text-gray-500 py-8">Sin datos este mes</td>
                     </tr>
                   )}
                   {equipo.map((e) => (
-                    <tr
-                      key={e.usuario_id}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-gray-900 font-medium">
-                        {e.nombre}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 capitalize">
-                        {e.tipo_usuario}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600">
-                        {e.dias_trabajados}
-                      </td>
-                      <td className="px-4 py-3 text-right text-brand-gold font-bold font-mono">
-                        {e.total_horas}h
-                      </td>
+                    <tr key={e.usuario_id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-900 font-medium">{e.nombre}</td>
+                      <td className="px-4 py-3 text-gray-500 capitalize">{e.tipo_usuario}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{e.dias_trabajados}</td>
+                      <td className="px-4 py-3 text-right text-brand-gold font-bold font-mono">{e.total_horas}h</td>
                     </tr>
                   ))}
                 </tbody>
                 {equipo.length > 0 && (
                   <tfoot>
                     <tr className="border-t border-gray-200 bg-gray-50">
-                      <td colSpan={3} className="px-4 py-3 text-gray-900 font-semibold">
-                        Total equipo
-                      </td>
+                      <td colSpan={3} className="px-4 py-3 text-gray-900 font-semibold">Total equipo</td>
                       <td className="px-4 py-3 text-right text-brand-gold font-bold font-mono">
                         {equipo.reduce((s, e) => s + e.total_horas, 0).toFixed(2)}h
                       </td>
@@ -707,13 +718,48 @@ export default function AsistenciaPage() {
               </table>
             </div>
           </div>
+
+          {/* Team — mobile cards */}
+          <div className="sm:hidden space-y-2">
+            {equipo.length === 0 && (
+              <p className="text-center text-gray-400 py-8 text-sm">Sin datos este mes</p>
+            )}
+            {equipo.map((e) => (
+              <div key={e.usuario_id} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{e.nombre}</p>
+                    <p className="text-[11px] text-gray-400 capitalize">{e.tipo_usuario}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-gray-600">{e.dias_trabajados}</p>
+                      <p className="text-[10px] text-gray-400">días</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-brand-gold font-mono">{e.total_horas}h</p>
+                      <p className="text-[10px] text-gray-400">horas</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {equipo.length > 0 && (
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">Total equipo</span>
+                <span className="text-sm font-bold text-brand-gold font-mono">
+                  {equipo.reduce((s, e) => s + e.total_horas, 0).toFixed(2)}h
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* ══════════════════════════════ TAB: CONFIGURACIÓN ═══════ */}
       {tab === "config" && isAdmin && (
-        <div className="max-w-lg space-y-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="max-w-lg space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <MapPin className="h-5 w-5 text-brand-gold" />
               Ubicación del Local

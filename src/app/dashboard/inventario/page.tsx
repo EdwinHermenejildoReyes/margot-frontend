@@ -64,40 +64,40 @@ export default function InventarioPage() {
   const totalPages = Math.ceil(totalCount / 20);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Inventario</h1>
-        <p className="text-sm text-gray-500 mt-1">{totalCount} insumos registrados</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Inventario</h1>
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">{totalCount} insumos registrados</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-            <Package className="h-5 w-5 text-blue-600" />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+            <Package className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Total Ítems</p>
-            <p className="text-xl font-bold text-gray-900">{resumen.total_items}</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-            <DollarSign className="h-5 w-5 text-green-600" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Valor Total</p>
-            <p className="text-xl font-bold text-gray-900">${resumen.valor_total_inventario.toFixed(2)}</p>
+          <div className="text-center sm:text-left">
+            <p className="text-[10px] sm:text-sm text-gray-500">Total Ítems</p>
+            <p className="text-lg sm:text-xl font-bold text-gray-900">{resumen.total_items}</p>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
+        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-green-100 flex items-center justify-center">
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Stock Bajo</p>
-            <p className="text-xl font-bold text-red-600">{resumen.items_stock_bajo}</p>
+          <div className="text-center sm:text-left">
+            <p className="text-[10px] sm:text-sm text-gray-500">Valor Total</p>
+            <p className="text-base sm:text-xl font-bold text-gray-900">${resumen.valor_total_inventario.toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-red-100 flex items-center justify-center">
+            <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+          </div>
+          <div className="text-center sm:text-left">
+            <p className="text-[10px] sm:text-sm text-gray-500">Stock Bajo</p>
+            <p className="text-lg sm:text-xl font-bold text-red-600">{resumen.items_stock_bajo}</p>
           </div>
         </div>
       </div>
@@ -148,59 +148,108 @@ export default function InventarioPage() {
           <p className="text-gray-400 text-lg">No se encontraron insumos</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/50">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Insumo</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Categoría</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Stock</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Mínimo</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
-                  <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {items.map((item) => {
-                  const stockBajo = parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo);
-                  return (
-                    <tr key={item.id} className={clsx("hover:bg-gray-50/50 transition-colors", stockBajo && "bg-red-50/50")}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center", stockBajo ? "bg-red-100" : "bg-blue-100")}>
-                            <Package className={clsx("h-4 w-4", stockBajo ? "text-red-600" : "text-blue-600")} />
+        <>
+          {/* ═══ DESKTOP TABLE ═══ */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/50">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Insumo</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Stock</th>
+                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Mínimo</th>
+                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {items.map((item) => {
+                    const stockBajo = parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo);
+                    return (
+                      <tr key={item.id} className={clsx("hover:bg-gray-50/50 transition-colors", stockBajo && "bg-red-50/50")}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center", stockBajo ? "bg-red-100" : "bg-blue-100")}>
+                              <Package className={clsx("h-4 w-4", stockBajo ? "text-red-600" : "text-blue-600")} />
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-gray-900">{item.nombre}</span>
+                              {item.proveedor_nombre && <p className="text-xs text-gray-400">{item.proveedor_nombre}</p>}
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">{item.nombre}</span>
-                            {item.proveedor_nombre && <p className="text-xs text-gray-400">{item.proveedor_nombre}</p>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{item.categoria_nombre || "—"}</td>
-                      <td className="px-6 py-4 text-right">
-                        <span className={clsx("text-sm font-semibold", stockBajo ? "text-red-600" : "text-gray-900")}>
-                          {item.stock_actual} {item.unidad_abreviatura || ""}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-500">{item.stock_minimo}</td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-900">${item.costo_unitario}</td>
-                      <td className="px-6 py-4 text-center">
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{item.categoria_nombre || "—"}</td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={clsx("text-sm font-semibold", stockBajo ? "text-red-600" : "text-gray-900")}>
+                            {item.stock_actual} {item.unidad_abreviatura || ""}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm text-gray-500">{item.stock_minimo}</td>
+                        <td className="px-6 py-4 text-right text-sm text-gray-900">${item.costo_unitario}</td>
+                        <td className="px-6 py-4 text-center">
+                          {stockBajo ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <AlertTriangle className="h-3 w-3" /> Bajo
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ═══ MOBILE CARDS ═══ */}
+          <div className="md:hidden space-y-2">
+            {items.map((item) => {
+              const stockBajo = parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo);
+              return (
+                <div
+                  key={item.id}
+                  className={clsx(
+                    "bg-white rounded-xl border p-3 transition-all",
+                    stockBajo ? "border-red-200 bg-red-50/30" : "border-gray-200"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0", stockBajo ? "bg-red-100" : "bg-blue-100")}>
+                        <Package className={clsx("h-4 w-4", stockBajo ? "text-red-600" : "text-blue-600")} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{item.nombre}</p>
+                        <p className="text-[11px] text-gray-400">
+                          {item.categoria_nombre || "Sin categoría"}
+                          {item.proveedor_nombre ? ` · ${item.proveedor_nombre}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                      <span className={clsx("text-sm font-bold", stockBajo ? "text-red-600" : "text-gray-900")}>
+                        {item.stock_actual} {item.unidad_abreviatura || ""}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400">mín: {item.stock_minimo}</span>
                         {stockBajo ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            <AlertTriangle className="h-3 w-3" /> Bajo
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
+                            <AlertTriangle className="h-2.5 w-2.5" /> Bajo
                           </span>
                         ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                          <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">OK</span>
                         )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </>
       )}
 
       {/* Pagination */}

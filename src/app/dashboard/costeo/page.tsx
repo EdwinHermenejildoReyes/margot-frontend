@@ -47,8 +47,10 @@ interface ExtraCostRow {
   monto: number;
 }
 
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
 const emptyIngredient = (): IngredientRow => ({
-  id: crypto.randomUUID(),
+  id: uid(),
   insumo_id: null,
   nombre: "",
   costo_unitario: 0,
@@ -57,7 +59,7 @@ const emptyIngredient = (): IngredientRow => ({
 });
 
 const emptyExtra = (): ExtraCostRow => ({
-  id: crypto.randomUUID(),
+  id: uid(),
   concepto: "",
   monto: 0,
 });
@@ -70,8 +72,8 @@ export default function CosteoPage() {
     emptyIngredient(),
   ]);
   const [extras, setExtras] = useState<ExtraCostRow[]>([
-    { id: crypto.randomUUID(), concepto: "Empaque", monto: 0 },
-    { id: crypto.randomUUID(), concepto: "Mano de obra", monto: 0 },
+    { id: uid(), concepto: "Empaque", monto: 0 },
+    { id: uid(), concepto: "Mano de obra", monto: 0 },
   ]);
   const [porcentajeUtilidad, setPorcentajeUtilidad] = useState(30);
   const [porcentajeCostoFijo, setPorcentajeCostoFijo] = useState(40);
@@ -204,7 +206,7 @@ export default function CosteoPage() {
       setIngredientes(
         data.ingredientes.length > 0
           ? data.ingredientes.map((i) => ({
-              id: crypto.randomUUID(),
+              id: uid(),
               insumo_id: i.insumo ?? null,
               nombre: i.nombre,
               costo_unitario: parseFloat(String(i.costo_unitario)),
@@ -216,7 +218,7 @@ export default function CosteoPage() {
       setExtras(
         data.extras.length > 0
           ? data.extras.map((e) => ({
-              id: crypto.randomUUID(),
+              id: uid(),
               concepto: e.concepto,
               monto: parseFloat(String(e.monto)),
             }))
@@ -316,8 +318,8 @@ export default function CosteoPage() {
     setPorciones(1);
     setIngredientes([emptyIngredient()]);
     setExtras([
-      { id: crypto.randomUUID(), concepto: "Empaque", monto: 0 },
-      { id: crypto.randomUUID(), concepto: "Mano de obra", monto: 0 },
+      { id: uid(), concepto: "Empaque", monto: 0 },
+      { id: uid(), concepto: "Mano de obra", monto: 0 },
     ]);
     setPorcentajeUtilidad(30);
     setPorcentajeCostoFijo(40);

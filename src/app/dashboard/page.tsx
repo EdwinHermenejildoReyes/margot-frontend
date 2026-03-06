@@ -26,13 +26,19 @@ function StatCard({ title, value, icon: Icon, color, href }: {
   title: string; value: number | string; icon: React.ElementType; color: string; href: string;
 }) {
   return (
-    <Link href={href} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow group">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+    <Link href={href} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-6 hover:shadow-lg transition-shadow group">
+      {/* Mobile: vertical layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+        <div className="flex items-center gap-2 sm:block">
+          <div className={`h-8 w-8 sm:hidden rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
+            <Icon className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <p className="text-xs sm:text-sm font-medium text-gray-500">{title}</p>
+            <p className="text-xl sm:text-3xl font-bold text-gray-900 sm:mt-1">{value}</p>
+          </div>
         </div>
-        <div className={`h-12 w-12 rounded-xl ${color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+        <div className={`hidden sm:flex h-12 w-12 rounded-xl ${color} items-center justify-center group-hover:scale-110 transition-transform`}>
           <Icon className="h-6 w-6 text-white" />
         </div>
       </div>
@@ -80,17 +86,17 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           ¡Hola, {user?.first_name || user?.username}! 👋
         </h1>
         <p className="text-gray-500 mt-1">Aquí tienes un resumen de tu restaurante</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <StatCard title="Ítems del Menú" value={stats.menuItems} icon={UtensilsCrossed} color="bg-brand-gold" href="/dashboard/menu" />
         <StatCard title="Pedidos Pendientes" value={stats.pedidosPendientes} icon={ShoppingCart} color="bg-blue-500" href="/dashboard/pedidos" />
         <StatCard title="Mesas Disponibles" value={stats.mesasDisponibles} icon={Armchair} color="bg-green-500" href="/dashboard/mesas" />
@@ -100,32 +106,32 @@ export default function DashboardPage() {
       {/* Quick Actions & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/dashboard/pedidos" className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors">
-              <ShoppingCart className="h-5 w-5" />
-              <span className="text-sm font-medium">Ver Pedidos</span>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Acciones Rápidas</h2>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <Link href="/dashboard/pedidos" className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Ver Pedidos</span>
             </Link>
-            <Link href="/dashboard/cocina" className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors">
-              <ChefHat className="h-5 w-5" />
-              <span className="text-sm font-medium">Cocina</span>
+            <Link href="/dashboard/cocina" className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors">
+              <ChefHat className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Cocina</span>
             </Link>
-            <Link href="/dashboard/mesas" className="flex items-center gap-3 p-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 transition-colors">
-              <Armchair className="h-5 w-5" />
-              <span className="text-sm font-medium">Mesas</span>
+            <Link href="/dashboard/mesas" className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 transition-colors">
+              <Armchair className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Mesas</span>
             </Link>
-            <Link href="/dashboard/inventario" className="flex items-center gap-3 p-3 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 transition-colors">
-              <Package className="h-5 w-5" />
-              <span className="text-sm font-medium">Inventario</span>
+            <Link href="/dashboard/inventario" className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 transition-colors">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Inventario</span>
             </Link>
           </div>
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Últimos Pedidos</h2>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Últimos Pedidos</h2>
             <Link href="/dashboard/pedidos" className="text-sm text-brand-gold hover:text-brand-bronze font-medium">Ver todos →</Link>
           </div>
           {recentOrders.length === 0 ? (
