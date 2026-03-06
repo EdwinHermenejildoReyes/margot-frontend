@@ -289,3 +289,61 @@ export interface CosteoRecetaDetail {
   updated_at: string;
   created_at: string;
 }
+
+// ── Asistencia ──
+
+export interface ConfiguracionLocal {
+  id: number;
+  nombre: string;
+  latitud: string;
+  longitud: string;
+  radio_metros: number;
+  direccion: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegistroAsistencia {
+  id: number;
+  usuario: number;
+  usuario_nombre: string;
+  tipo_usuario: string;
+  local: number | null;
+  fecha: string;
+  hora_entrada: string;
+  hora_salida: string | null;
+  latitud_entrada: string;
+  longitud_entrada: string;
+  distancia_entrada: string;
+  latitud_salida: string | null;
+  longitud_salida: string | null;
+  distancia_salida: string;
+  estado: "en_turno" | "completado" | "irregular";
+  notas: string;
+  horas_trabajadas: number | null;
+  horas_trabajadas_display: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResumenMensual {
+  mes: number;
+  anio: number;
+  total_horas: number;
+  dias_trabajados: number;
+  registros: RegistroAsistencia[];
+}
+
+export interface ResumenEmpleado {
+  usuario_id: number;
+  nombre: string;
+  tipo_usuario: string;
+  total_horas: number;
+  dias_trabajados: number;
+}
+
+export interface ResumenEquipo {
+  mes: number;
+  anio: number;
+  equipo: ResumenEmpleado[];
+}

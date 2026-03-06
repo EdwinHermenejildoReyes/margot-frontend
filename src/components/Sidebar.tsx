@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   X,
+  Clock,
 } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
@@ -32,6 +33,7 @@ const navigation = [
   { name: "Costeo", href: "/dashboard/costeo", icon: Calculator },
   { name: "Estadísticas", href: "/dashboard/estadisticas", icon: BarChart3 },
   { name: "Limpieza", href: "/dashboard/limpieza", icon: SprayCanIcon },
+  { name: "Asistencia", href: "/dashboard/asistencia", icon: Clock },
 ];
 
 export default function Sidebar() {

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.1.108"],
   images: {
     remotePatterns: [
       {
@@ -12,6 +13,12 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "localhost",
+        port: "8004",
+        pathname: "/media/**",
+      },
+      {
+        protocol: "http",
+        hostname: "192.168.1.108",
         port: "8004",
         pathname: "/media/**",
       },

@@ -259,9 +259,9 @@ export default function NuevoPedidoPage() {
   if (loading) return <LoadingSpinner className="min-h-[50vh]" />;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-8rem)]">
       {/* ══════════ LEFT: Menu Catalog ══════════ */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col lg:min-h-0">
         {/* Header */}
         <div className="flex items-center gap-4 mb-4">
           <button onClick={() => router.back()} className="p-2 rounded-lg hover:bg-gray-100">
@@ -315,7 +315,7 @@ export default function NuevoPedidoPage() {
         </div>
 
         {/* Menu Items Grid – grouped by category */}
-        <div className="flex-1 overflow-y-auto pr-1">
+        <div className="flex-1 overflow-y-auto pr-1 min-h-[50vh] lg:min-h-0">
           {totalFilteredItems === 0 ? (
             <div className="text-center py-16">
               <UtensilsCrossed className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -396,7 +396,7 @@ export default function NuevoPedidoPage() {
       </div>
 
       {/* ══════════ RIGHT: Cart / Order Summary ══════════ */}
-      <div className="w-full lg:w-96 flex flex-col bg-white rounded-xl border border-gray-200 min-h-0">
+      <div className="w-full lg:w-96 flex flex-col bg-white rounded-xl border border-gray-200 lg:min-h-0">
         {/* Cart Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">

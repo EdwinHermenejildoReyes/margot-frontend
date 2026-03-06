@@ -1,13 +1,24 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import type { Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { ShoppingCart, Search, ChevronLeft, ChevronRight, Eye, Plus } from "lucide-react";
+import {
+  ShoppingCart,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronRightIcon,
+  Plus,
+  Clock,
+  Armchair,
+} from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import clsx from "clsx";
 import StockInsuficienteModal, {
   type StockErrorResponse,
 } from "@/components/StockInsuficienteModal";
@@ -24,6 +35,7 @@ const ESTADOS = [
 ];
 
 export default function PedidosPage() {
+  const router = useRouter();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -48,9 +60,13 @@ export default function PedidosPage() {
     }
   }, [page, search, estado]);
 
-  useEffect(() => { fetchPedidos(); }, [fetchPedidos]);
+  useEffect(() => {
+    fetchPedidos();
+  }, [fetchPedidos]);
 
-  const handleAction = async (id: number, action: string) => {
+  const handleAction = async (e: React.MouseEvent, id: number, action: string) => {
+    e.stopPropagation();
+    e.preventDefault();
     try {
       await api.post(`/pedidos/${id}/${action}/`);
       toast.success(`Pedido ${action} exitosamente`);
@@ -70,8 +86,25 @@ export default function PedidosPage() {
 
   const totalPages = Math.ceil(totalCount / 20);
 
+  /* ── Action button config by state ── */
+  function getActionButton(pedido: Pedido) {
+    switch (pedido.estado) {
+      case "pendiente":
+        return { label: "Confirmar", action: "confirmar", colors: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" };
+      case "confirmado":
+        return { label: "Preparar", action: "preparar", colors: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" };
+      case "en_preparacion":
+        return { label: "Listo", action: "listo", colors: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200" };
+      case "listo":
+        return { label: "Entregar", action: "entregar", colors: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200" };
+      default:
+        return null;
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
@@ -79,7 +112,7 @@ export default function PedidosPage() {
         </div>
         <Link
           href="/dashboard/pedidos/nuevo"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
         >
           <Plus className="h-4 w-4" />
           Nuevo Pedido
@@ -95,7 +128,10 @@ export default function PedidosPage() {
               type="text"
               placeholder="Buscar por número de pedido..."
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold"
             />
           </div>
@@ -103,12 +139,16 @@ export default function PedidosPage() {
             {ESTADOS.map((e) => (
               <button
                 key={e.value}
-                onClick={() => { setEstado(e.value); setPage(1); }}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                onClick={() => {
+                  setEstado(e.value);
+                  setPage(1);
+                }}
+                className={clsx(
+                  "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
                   estado === e.value
                     ? "bg-brand-gold text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                )}
               >
                 {e.label}
               </button>
@@ -117,7 +157,7 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Content */}
       {loading ? (
         <LoadingSpinner />
       ) : pedidos.length === 0 ? (
@@ -126,81 +166,152 @@ export default function PedidosPage() {
           <p className="text-gray-400 text-lg">No se encontraron pedidos</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/50">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Pedido</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Mesa</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Total</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {pedidos.map((pedido) => (
-                  <tr key={pedido.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-gray-900">{pedido.numero_pedido}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 capitalize">{pedido.tipo_entrega?.replace(/_/g, " ")}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {pedido.mesa_numero ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-sage text-brand-dark text-xs font-medium">
-                          Mesa {pedido.mesa_numero}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4"><StatusBadge status={pedido.estado} /></td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-gray-900">${pedido.total}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-500">{new Date(pedido.created_at).toLocaleDateString("es-ES")}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          href={`/dashboard/pedidos/${pedido.id}`}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        {pedido.estado === "pendiente" && (
-                          <button onClick={() => handleAction(pedido.id, "confirmar")} className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100">
-                            Confirmar
-                          </button>
-                        )}
-                        {pedido.estado === "confirmado" && (
-                          <button onClick={() => handleAction(pedido.id, "preparar")} className="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100">
-                            Preparar
-                          </button>
-                        )}
-                        {pedido.estado === "en_preparacion" && (
-                          <button onClick={() => handleAction(pedido.id, "listo")} className="px-2.5 py-1 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100">
-                            Listo
-                          </button>
-                        )}
-                        {pedido.estado === "listo" && (
-                          <button onClick={() => handleAction(pedido.id, "entregar")} className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100">
-                            Entregar
+        <>
+          {/* ═══════════ DESKTOP TABLE (hidden on mobile) ═══════════ */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/50">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Pedido</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Mesa</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Total</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pedidos.map((pedido) => {
+                    const actionBtn = getActionButton(pedido);
+                    return (
+                      <tr
+                        key={pedido.id}
+                        className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/dashboard/pedidos/${pedido.id}`)}
+                      >
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-medium text-gray-900">{pedido.numero_pedido}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-600 capitalize">
+                            {pedido.tipo_entrega?.replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {pedido.mesa_numero ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-sage text-brand-dark text-xs font-medium">
+                              <Armchair className="h-3 w-3" />
+                              Mesa {pedido.mesa_numero}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={pedido.estado} />
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-semibold text-gray-900">${pedido.total}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-500">
+                            {new Date(pedido.created_at).toLocaleDateString("es-ES")}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {actionBtn && (
+                              <button
+                                onClick={(e) => handleAction(e, pedido.id, actionBtn.action)}
+                                className={clsx("px-2.5 py-1 rounded-lg text-xs font-medium border", actionBtn.colors)}
+                              >
+                                {actionBtn.label}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ═══════════ MOBILE CARDS (hidden on desktop) ═══════════ */}
+          <div className="md:hidden space-y-3">
+            {pedidos.map((pedido) => {
+              const actionBtn = getActionButton(pedido);
+              return (
+                <Link
+                  key={pedido.id}
+                  href={`/dashboard/pedidos/${pedido.id}`}
+                  className="block bg-white rounded-xl border border-gray-200 hover:border-brand-gold hover:shadow-md transition-all"
+                >
+                  <div className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      {/* Left: pedido info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="h-8 w-8 rounded-lg bg-brand-sage flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart className="h-4 w-4 text-brand-bronze" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-sm font-bold text-gray-900 truncate block">
+                              {pedido.numero_pedido}
+                            </span>
+                            <span className="text-xs text-gray-500 capitalize">
+                              {pedido.tipo_entrega?.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <StatusBadge status={pedido.estado} />
+                          <span className="flex items-center gap-0.5 text-[11px] text-gray-400">
+                            <Clock className="h-3 w-3" />
+                            {new Date(pedido.created_at).toLocaleDateString("es-ES", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right: mesa + total + chevron */}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          {pedido.mesa_numero && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-brand-sage text-brand-dark text-[10px] font-bold">
+                              <Armchair className="h-2.5 w-2.5" />
+                              {pedido.mesa_numero}
+                            </span>
+                          )}
+                          <span className="text-sm font-bold text-brand-gold">${pedido.total}</span>
+                          <ChevronRightIcon className="h-4 w-4 text-gray-300" />
+                        </div>
+                        {actionBtn && (
+                          <button
+                            onClick={(e) => handleAction(e, pedido.id, actionBtn.action)}
+                            className={clsx(
+                              "px-2.5 py-1 rounded-lg text-[11px] font-medium border",
+                              actionBtn.colors
+                            )}
+                          >
+                            {actionBtn.label}
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        </div>
+        </>
       )}
 
       {/* ═══ STOCK INSUFICIENTE MODAL ═══ */}
@@ -214,11 +325,21 @@ export default function PedidosPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 hover:bg-gray-50">
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 hover:bg-gray-50"
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-sm text-gray-600">Página {page} de {totalPages}</span>
-          <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 hover:bg-gray-50">
+          <span className="text-sm text-gray-600">
+            Página {page} de {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page === totalPages}
+            className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 hover:bg-gray-50"
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
