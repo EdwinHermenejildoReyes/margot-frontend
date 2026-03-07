@@ -1,10 +1,17 @@
 import axios from "axios";
 
-// Call Django directly (bypass Next.js proxy) to avoid trailing-slash issues
-const API_BASE_URL =
-  typeof window !== "undefined"
-    ? `http://${window.location.hostname}:8004/api/v1`
-    : "http://localhost:8004/api/v1";
+// PC (localhost) → connect directly to Django on port 8004
+// Mobile/other devices → use Next.js proxy (they can't reach port 8004)
+function getBaseURL(): string {
+  if (typeof window === "undefined") return "http://localhost:8004/api/v1";
+  const h = window.location.hostname;
+  if (h === "localhost" || h === "127.0.0.1") {
+    return "http://localhost:8004/api/v1";
+  }
+  return "/api/v1"; // goes through Next.js rewrite proxy
+}
+
+const API_BASE_URL = getBaseURL();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -49,7 +56,7 @@ api.interceptors.response.use(
       } catch {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
-        if (typeof window !== "undefined") window.location.href = "/login";
+        // Don't redirect here — let AuthContext handle navigation
       }
     }
     return Promise.reject(error);
