@@ -9,6 +9,7 @@ import type { AlertaStockBajo, AlertasNoLeidasResponse } from "@/lib/types";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -81,7 +82,10 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* ── Notification bell ── */}
+        {/* ── Order notifications bell ── */}
+        <NotificationBell />
+
+        {/* ── Stock alerts bell ── */}
         {canViewAlerts(user) && (
           <div className="relative" ref={panelRef}>
             <button

@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import api from "@/lib/api";
-import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse } from "@/lib/types";
+import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
   ArrowLeft,
@@ -18,6 +18,8 @@ import {
   StickyNote,
   X,
   ChevronDown,
+  Package,
+  Truck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -65,20 +67,27 @@ export default function NuevoPedidoPage() {
   const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
   const [stockWarnings, setStockWarnings] = useState<Map<number, number>>(new Map()); // menuItemId → porciones_posibles
 
+  /* ── Empaques states ── */
+  const [tiposEmpaque, setTiposEmpaque] = useState<TipoEmpaque[]>([]);
+  const [cartEmpaques, setCartEmpaques] = useState<Map<number, number>>(new Map()); // tipoEmpaqueId → cantidad
+  const [costoDelivery, setCostoDelivery] = useState<string>("");
+
   /* ── Fetch data ── */
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [menuRes, catRes, mesasRes, atencionesRes] = await Promise.all([
+        const [menuRes, catRes, mesasRes, atencionesRes, empaquesRes] = await Promise.all([
           api.get<PaginatedResponse<MenuItem>>("/menu-items/?page_size=200&is_available=true"),
           api.get<PaginatedResponse<Category>>("/categorias/?page_size=50"),
           api.get<PaginatedResponse<Mesa>>("/mesas/"),
           api.get("/atenciones/activas/"),
+          api.get<PaginatedResponse<TipoEmpaque>>("/tipos-empaque/?page_size=50"),
         ]);
         setMenuItems(menuRes.data.results || []);
         setCategories(catRes.data.results || []);
         setMesas(mesasRes.data.results || []);
         setAtenciones(Array.isArray(atencionesRes.data) ? atencionesRes.data : atencionesRes.data.results || []);
+        setTiposEmpaque(empaquesRes.data.results || []);
       } catch {
         toast.error("Error al cargar datos");
       } finally {
@@ -200,6 +209,37 @@ export default function NuevoPedidoPage() {
 
   const cartCount = useMemo(() => cart.reduce((sum, c) => sum + c.cantidad, 0), [cart]);
 
+  const empaquesTotal = useMemo(() => {
+    let total = 0;
+    cartEmpaques.forEach((cantidad, tipoId) => {
+      const tipo = tiposEmpaque.find((t) => t.id === tipoId);
+      if (tipo) total += parseFloat(tipo.precio) * cantidad;
+    });
+    return total;
+  }, [cartEmpaques, tiposEmpaque]);
+
+  const deliveryTotal = useMemo(
+    () => (costoDelivery ? parseFloat(costoDelivery) || 0 : 0),
+    [costoDelivery]
+  );
+
+  const grandTotal = useMemo(
+    () => cartTotal + empaquesTotal + deliveryTotal,
+    [cartTotal, empaquesTotal, deliveryTotal]
+  );
+
+  /* ── Empaques helpers ── */
+  const updateEmpaqueCantidad = (tipoId: number, delta: number) => {
+    setCartEmpaques((prev) => {
+      const next = new Map(prev);
+      const current = next.get(tipoId) || 0;
+      const newVal = Math.max(0, current + delta);
+      if (newVal === 0) next.delete(tipoId);
+      else next.set(tipoId, newVal);
+      return next;
+    });
+  };
+
   /* ── Submit order ── */
   const handleSubmit = async () => {
     if (cart.length === 0) {
@@ -227,6 +267,20 @@ export default function NuevoPedidoPage() {
       if (tipoEntrega === "local") {
         if (mesaId) payload.mesa = mesaId;
         if (atencionId) payload.atencion = atencionId;
+      }
+
+      // Empaques (solo para llevar / domicilio)
+      if (tipoEntrega !== "local" && cartEmpaques.size > 0) {
+        const empaques: { tipo_empaque: number; cantidad: number }[] = [];
+        cartEmpaques.forEach((cantidad, tipoId) => {
+          if (cantidad > 0) empaques.push({ tipo_empaque: tipoId, cantidad });
+        });
+        if (empaques.length > 0) payload.empaques = empaques;
+      }
+
+      // Costo delivery (solo domicilio)
+      if (tipoEntrega === "domicilio" && deliveryTotal > 0) {
+        payload.costo_delivery = deliveryTotal;
       }
 
       await api.post("/pedidos/", payload);
@@ -417,11 +471,20 @@ export default function NuevoPedidoPage() {
               {[
                 { value: "local", label: "Local", icon: Armchair },
                 { value: "para_llevar", label: "Llevar", icon: ShoppingCart },
-                { value: "domicilio", label: "Delivery", icon: UtensilsCrossed },
+                { value: "domicilio", label: "Delivery", icon: Truck },
               ].map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setTipoEntrega(opt.value)}
+                  onClick={() => {
+                    setTipoEntrega(opt.value);
+                    if (opt.value === "local") {
+                      setCartEmpaques(new Map());
+                      setCostoDelivery("");
+                    }
+                    if (opt.value !== "domicilio") {
+                      setCostoDelivery("");
+                    }
+                  }}
                   className={clsx(
                     "flex flex-col items-center gap-1 p-2 rounded-lg text-xs font-medium transition-all border",
                     tipoEntrega === opt.value
@@ -468,6 +531,64 @@ export default function NuevoPedidoPage() {
                   Vinculado a atención #{atenciones.find((a) => a.id === atencionId)?.numero_atencion}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Empaques selector (para llevar / domicilio) */}
+          {tipoEntrega !== "local" && tiposEmpaque.length > 0 && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
+                <Package className="h-3.5 w-3.5" />
+                Empaques
+              </label>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {tiposEmpaque.map((tipo) => {
+                  const cant = cartEmpaques.get(tipo.id) || 0;
+                  return (
+                    <div key={tipo.id} className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-700 truncate">{tipo.nombre}</p>
+                        <p className="text-[10px] text-gray-400">${tipo.precio}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateEmpaqueCantidad(tipo.id, -1)}
+                          className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-xs"
+                          disabled={cant === 0}
+                        >
+                          <Minus className="h-2.5 w-2.5" />
+                        </button>
+                        <span className="text-xs font-semibold w-5 text-center">{cant}</span>
+                        <button
+                          onClick={() => updateEmpaqueCantidad(tipo.id, 1)}
+                          className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-xs"
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Delivery cost (solo domicilio) */}
+          {tipoEntrega === "domicilio" && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
+                <Truck className="h-3.5 w-3.5" />
+                Costo de Delivery
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={costoDelivery}
+                onChange={(e) => setCostoDelivery(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+              />
             </div>
           )}
         </div>
@@ -570,9 +691,21 @@ export default function NuevoPedidoPage() {
             <span className="text-sm text-gray-500">Subtotal</span>
             <span className="text-sm text-gray-700">${cartTotal.toFixed(2)}</span>
           </div>
+          {empaquesTotal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Empaques</span>
+              <span className="text-sm text-gray-700">${empaquesTotal.toFixed(2)}</span>
+            </div>
+          )}
+          {deliveryTotal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Delivery</span>
+              <span className="text-sm text-gray-700">${deliveryTotal.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center">
             <span className="text-base font-bold text-gray-900">Total</span>
-            <span className="text-xl font-bold text-brand-gold">${cartTotal.toFixed(2)}</span>
+            <span className="text-xl font-bold text-brand-gold">${grandTotal.toFixed(2)}</span>
           </div>
           <button
             onClick={handleSubmit}
@@ -584,7 +717,7 @@ export default function NuevoPedidoPage() {
             ) : (
               <>
                 <ShoppingCart className="h-4 w-4" />
-                Crear Pedido — ${cartTotal.toFixed(2)}
+                Crear Pedido — ${grandTotal.toFixed(2)}
               </>
             )}
           </button>

@@ -1,12 +1,23 @@
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Call Django directly (bypass Next.js proxy) to avoid trailing-slash issues
+const API_BASE_URL =
+  typeof window !== "undefined"
+    ? `http://${window.location.hostname}:8004/api/v1`
+    : "http://localhost:8004/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
 api.interceptors.request.use((config) => {
+  // Asegurar trailing slash para Django APPEND_SLASH
+  if (config.url && !config.url.endsWith('/') && !config.url.includes('?')) {
+    config.url = config.url + '/';
+  } else if (config.url && config.url.includes('?') && !config.url.split('?')[0].endsWith('/')) {
+    const [path, query] = config.url.split('?');
+    config.url = path + '/?' + query;
+  }
   // Auto-set Content-Type: axios sets multipart/form-data for FormData automatically
   if (!(config.data instanceof FormData)) {
     config.headers["Content-Type"] = config.headers["Content-Type"] || "application/json";

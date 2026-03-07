@@ -20,8 +20,19 @@ export default function LoginPage() {
     try {
       await login(username, password);
       toast.success("¡Bienvenido!");
-    } catch {
-      toast.error("Credenciales incorrectas");
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "response" in err) {
+        const axiosErr = err as { response?: { status?: number } };
+        if (axiosErr.response?.status === 401) {
+          toast.error("Credenciales incorrectas");
+        } else {
+          toast.error(`Error del servidor (${axiosErr.response?.status})`);
+        }
+      } else if (err && typeof err === "object" && "request" in err) {
+        toast.error("No se pudo conectar al servidor");
+      } else {
+        toast.error("Error inesperado al iniciar sesión");
+      }
     } finally {
       setLoading(false);
     }

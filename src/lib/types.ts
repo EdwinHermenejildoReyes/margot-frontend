@@ -72,12 +72,15 @@ export interface Pedido {
   estado: string;
   tipo_entrega: string;
   subtotal: string;
+  costo_delivery: string;
+  costo_empaques: string;
   impuestos: string;
   descuento: string;
   total: string;
   notas?: string;
   created_at: string;
   detalles?: PedidoDetalle[];
+  empaques?: PedidoEmpaque[];
 }
 
 export interface PedidoDetalle {
@@ -88,6 +91,41 @@ export interface PedidoDetalle {
   precio_unitario: string;
   subtotal: string;
   notas?: string;
+}
+
+export interface TipoEmpaque {
+  id: number;
+  nombre: string;
+  precio: string;
+  descripcion: string;
+  is_active: boolean;
+}
+
+export interface PedidoEmpaque {
+  id: number;
+  tipo_empaque: number;
+  tipo_empaque_nombre: string;
+  cantidad: number;
+  precio_unitario: string;
+  subtotal: string;
+}
+
+export interface Notificacion {
+  id: number;
+  tipo: string;
+  tipo_display: string;
+  titulo: string;
+  mensaje: string;
+  destinatario?: number;
+  pedido?: number;
+  pedido_numero?: string;
+  leida: boolean;
+  created_at: string;
+}
+
+export interface NotificacionesNoLeidasResponse {
+  count: number;
+  notificaciones: Notificacion[];
 }
 
 // ── Mesas & Atención ──

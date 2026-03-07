@@ -1,32 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.1.108"],
+  allowedDevOrigins: ["192.168.100.5"],
   images: {
-    remotePatterns: [
+    unoptimized: true,
+  },
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
       {
-        protocol: "http",
-        hostname: "localhost",
-        port: "8000",
-        pathname: "/media/**",
+        source: "/api/v1/:path*",
+        destination: "http://localhost:8004/api/v1/:path*",
       },
       {
-        protocol: "http",
-        hostname: "localhost",
-        port: "8004",
-        pathname: "/media/**",
+        source: "/media/:path*",
+        destination: "http://localhost:8004/media/:path*",
       },
-      {
-        protocol: "http",
-        hostname: "192.168.1.108",
-        port: "8004",
-        pathname: "/media/**",
-      },
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
+    ];
   },
 };
 
