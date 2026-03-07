@@ -35,21 +35,24 @@ export const ROLE_ROUTES: Record<TipoUsuario, string[]> = {
   ],
   mesero: [
     "/dashboard",
-    "/dashboard/menu",
-    "/dashboard/pedidos",
     "/dashboard/mesas",
-    "/dashboard/asistencia",
-  ],
-  cocinero: [
-    "/dashboard",
-    "/dashboard/menu",
-    "/dashboard/cocina",
+    "/dashboard/pedidos",
+    "/dashboard/inventario",
+    "/dashboard/limpieza",
     "/dashboard/asistencia",
   ],
   cajero: [
     "/dashboard",
-    "/dashboard/pedidos",
     "/dashboard/mesas",
+    "/dashboard/pedidos",
+    "/dashboard/inventario",
+    "/dashboard/limpieza",
+    "/dashboard/asistencia",
+  ],
+  cocinero: [
+    "/dashboard/cocina",
+    "/dashboard/inventario",
+    "/dashboard/limpieza",
     "/dashboard/asistencia",
   ],
   cliente: [],
@@ -85,7 +88,7 @@ export function canViewAlerts(user: User | null): boolean {
 /** ¿El usuario puede gestionar (CRUD) esta sección? */
 export function canManage(
   user: User | null,
-  section: "menu" | "pedidos" | "mesas" | "cocina" | "inventario" | "estadisticas" | "limpieza"
+  section: "menu" | "pedidos" | "mesas" | "cocina" | "inventario" | "estadisticas" | "limpieza" | "asistencia"
 ): boolean {
   if (!user) return false;
   if (user.is_staff || user.tipo_usuario === "comercio") return true;
@@ -97,8 +100,11 @@ export function canManage(
       return ["mesero", "cajero"].includes(user.tipo_usuario);
     case "cocina":
       return user.tipo_usuario === "cocinero";
+    case "inventario":
+    case "limpieza":
+      // mesero, cajero, cocinero can view but NOT create/edit/delete
+      return false;
     case "menu":
-      // mesero, cocinero, cajero can only read — not manage
       return false;
     default:
       return false;

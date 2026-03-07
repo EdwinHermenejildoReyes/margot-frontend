@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { isInternal, canAccessRoute } from "@/lib/permissions";
+import { isInternal, canAccessRoute, ROLE_ROUTES } from "@/lib/permissions";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -19,8 +19,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!user) { router.push("/login"); return; }
     // No es personal interno → login
     if (!isInternal(user)) { router.push("/login"); return; }
-    // No tiene acceso a esta ruta → dashboard principal
-    if (!canAccessRoute(user, pathname)) { router.push("/dashboard"); return; }
+    // No tiene acceso a esta ruta → primera ruta disponible del rol
+    if (!canAccessRoute(user, pathname)) {
+      const firstRoute = user.is_staff
+        ? "/dashboard"
+        : (ROLE_ROUTES[user.tipo_usuario]?.[0] || "/dashboard");
+      router.push(firstRoute);
+      return;
+    }
   }, [loading, user, router, pathname]);
 
   if (loading) return <LoadingSpinner className="min-h-screen" />;
