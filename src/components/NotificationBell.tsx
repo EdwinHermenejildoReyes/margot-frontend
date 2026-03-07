@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import type { Notificacion, NotificacionesNoLeidasResponse } from "@/lib/types";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
@@ -40,6 +41,7 @@ const COLOR_MAP: Record<string, string> = {
 
 export default function NotificationBell() {
   const router = useRouter();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notificacion[]>([]);
   const [count, setCount] = useState(0);
@@ -110,8 +112,14 @@ export default function NotificationBell() {
     } catch {
       /* ignore */
     }
+    // Navigate based on user role
     if (n.pedido) {
-      router.push(`/dashboard/pedidos/${n.pedido}`);
+      const isCocinero = user?.tipo_usuario === "cocinero";
+      if (isCocinero) {
+        router.push("/dashboard/cocina");
+      } else {
+        router.push(`/dashboard/pedidos/${n.pedido}`);
+      }
       setOpen(false);
     }
   };
@@ -219,11 +227,12 @@ export default function NotificationBell() {
               <button
                 onClick={() => {
                   setOpen(false);
-                  router.push("/dashboard/pedidos");
+                  const isCocinero = user?.tipo_usuario === "cocinero";
+                  router.push(isCocinero ? "/dashboard/cocina" : "/dashboard/pedidos");
                 }}
                 className="text-xs text-brand-gold hover:text-brand-bronze font-medium transition-colors"
               >
-                Ver todos los pedidos →
+                {user?.tipo_usuario === "cocinero" ? "Ver cocina →" : "Ver todos los pedidos →"}
               </button>
             </div>
           )}

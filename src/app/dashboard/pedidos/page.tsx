@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import type { Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -36,6 +37,7 @@ const ESTADOS = [
 
 export default function PedidosPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -64,6 +66,12 @@ export default function PedidosPage() {
     fetchPedidos();
   }, [fetchPedidos]);
 
+  // Auto-refresh every 15s to reflect state changes from other users
+  useEffect(() => {
+    const interval = setInterval(fetchPedidos, 15000);
+    return () => clearInterval(interval);
+  }, [fetchPedidos]);
+
   const handleAction = async (e: React.MouseEvent, id: number, action: string) => {
     e.stopPropagation();
     e.preventDefault();
@@ -86,17 +94,30 @@ export default function PedidosPage() {
 
   const totalPages = Math.ceil(totalCount / 20);
 
-  /* ── Action button config by state ── */
+  /* ── Action button config by state and role ── */
   function getActionButton(pedido: Pedido) {
+    const tipo = user?.tipo_usuario;
+    const isAdmin = user?.is_staff || tipo === "comercio";
+    const isMeseroCajero = tipo === "mesero" || tipo === "cajero";
+    const isCocinero = tipo === "cocinero";
+
     switch (pedido.estado) {
       case "pendiente":
-        return { label: "Confirmar", action: "confirmar", colors: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" };
+        if (isAdmin || isMeseroCajero)
+          return { label: "✅ Confirmar", action: "confirmar", colors: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" };
+        return null;
       case "confirmado":
-        return { label: "Preparar", action: "preparar", colors: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" };
+        if (isAdmin || isCocinero)
+          return { label: "🔥 Preparar", action: "preparar", colors: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" };
+        return null;
       case "en_preparacion":
-        return { label: "Listo", action: "listo", colors: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200" };
+        if (isAdmin || isCocinero)
+          return { label: "✅ Listo", action: "listo", colors: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200" };
+        return null;
       case "listo":
-        return { label: "Entregar", action: "entregar", colors: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200" };
+        if (isAdmin || isMeseroCajero)
+          return { label: "🍽️ Entregar", action: "entregar", colors: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200" };
+        return null;
       default:
         return null;
     }

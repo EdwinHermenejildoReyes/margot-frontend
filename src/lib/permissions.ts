@@ -49,6 +49,7 @@ export const ROLE_ROUTES: Record<TipoUsuario, string[]> = {
   cajero: [
     "/dashboard",
     "/dashboard/pedidos",
+    "/dashboard/mesas",
     "/dashboard/asistencia",
   ],
   cliente: [],
@@ -93,7 +94,7 @@ export function canManage(
     case "pedidos":
       return ["mesero", "cajero"].includes(user.tipo_usuario);
     case "mesas":
-      return user.tipo_usuario === "mesero";
+      return ["mesero", "cajero"].includes(user.tipo_usuario);
     case "cocina":
       return user.tipo_usuario === "cocinero";
     case "menu":

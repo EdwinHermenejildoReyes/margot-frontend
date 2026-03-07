@@ -86,6 +86,7 @@ export interface Pedido {
 export interface PedidoDetalle {
   id: number;
   menu_item: number;
+  menu_item_name?: string;
   menu_item_nombre?: string;
   cantidad: number;
   precio_unitario: string;

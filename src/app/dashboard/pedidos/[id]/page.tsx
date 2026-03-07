@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import type { MenuItem, Category, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -76,6 +77,7 @@ interface EditItem {
 export default function PedidoDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [pedido, setPedido] = useState<PedidoDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -112,6 +114,14 @@ export default function PedidoDetailPage() {
     fetchPedido();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  // Auto-refresh every 10s to reflect state changes from other users
+  useEffect(() => {
+    if (editing) return; // Don't refresh while editing
+    const interval = setInterval(fetchPedido, 10000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id, editing]);
 
   /* ── Actions ── */
   const handleAction = async (action: string) => {
@@ -315,47 +325,75 @@ export default function PedidoDetailPage() {
               </button>
             </>
           )}
-          {/* Workflow actions (hidden while editing) */}
-          {isPendiente && !editing && (
-            <>
-              <button
-                onClick={() => handleAction("confirmar")}
-                className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600"
-              >
-                Confirmar
-              </button>
-              <button
-                onClick={() => handleAction("cancelar")}
-                className="px-4 py-2 rounded-lg bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100"
-              >
-                Cancelar Pedido
-              </button>
-            </>
-          )}
-          {pedido.estado === "confirmado" && (
-            <button
-              onClick={() => handleAction("preparar")}
-              className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600"
-            >
-              Iniciar Preparación
-            </button>
-          )}
-          {pedido.estado === "en_preparacion" && (
-            <button
-              onClick={() => handleAction("listo")}
-              className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600"
-            >
-              Marcar Listo
-            </button>
-          )}
-          {pedido.estado === "listo" && (
-            <button
-              onClick={() => handleAction("entregar")}
-              className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600"
-            >
-              Entregar
-            </button>
-          )}
+          {/* ── Role-based workflow actions ── */}
+          {!editing && (() => {
+            const tipo = user?.tipo_usuario;
+            const isAdmin = user?.is_staff || tipo === "comercio";
+            const isMeseroCajero = tipo === "mesero" || tipo === "cajero";
+            const isCocinero = tipo === "cocinero";
+
+            return (
+              <>
+                {/* Mesero/Cajero/Admin: Confirmar pedido pendiente */}
+                {isPendiente && (isAdmin || isMeseroCajero) && (
+                  <>
+                    <button
+                      onClick={() => handleAction("confirmar")}
+                      className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors"
+                    >
+                      ✅ Confirmar Pedido
+                    </button>
+                    <button
+                      onClick={() => handleAction("cancelar")}
+                      className="px-4 py-2 rounded-lg bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      Cancelar Pedido
+                    </button>
+                  </>
+                )}
+
+                {/* Cocinero/Admin: Iniciar preparación de pedido confirmado */}
+                {pedido?.estado === "confirmado" && (isAdmin || isCocinero) && (
+                  <button
+                    onClick={() => handleAction("preparar")}
+                    className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition-colors"
+                  >
+                    🔥 Iniciar Preparación
+                  </button>
+                )}
+
+                {/* Cocinero/Admin: Marcar listo */}
+                {pedido?.estado === "en_preparacion" && (isAdmin || isCocinero) && (
+                  <button
+                    onClick={() => handleAction("listo")}
+                    className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition-colors"
+                  >
+                    ✅ Marcar Listo
+                  </button>
+                )}
+
+                {/* Mesero/Cajero/Admin: Entregar pedido listo */}
+                {pedido?.estado === "listo" && (isAdmin || isMeseroCajero) && (
+                  <button
+                    onClick={() => handleAction("entregar")}
+                    className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 transition-colors"
+                  >
+                    🍽️ Entregar
+                  </button>
+                )}
+
+                {/* Admin: cancel any non-final state */}
+                {isAdmin && !["entregado", "cancelado"].includes(pedido?.estado || "") && !isPendiente && (
+                  <button
+                    onClick={() => handleAction("cancelar")}
+                    className="px-4 py-2 rounded-lg bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
 

@@ -79,6 +79,16 @@ export default function MesasPage() {
     load();
   }, []);
 
+  // Auto-refresh every 15s to reflect state changes
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      await fetchMesas();
+      const ats = await fetchAtenciones();
+      await fetchPedidosPorAtenciones(ats);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleOpenAtencion = (mesa: Mesa) => {
     setSelectedMesa(mesa);
     setShowAtencionModal(true);
