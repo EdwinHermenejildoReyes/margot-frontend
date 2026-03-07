@@ -8,6 +8,7 @@ import type { User } from "@/lib/types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  sidebarSections: string[];
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -17,18 +18,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarSections, setSidebarSections] = useState<string[]>([]);
   const router = useRouter();
 
   const fetchUser = async () => {
     try {
       const token = localStorage.getItem("access_token");
       if (!token) { setLoading(false); return; }
-      const { data } = await api.get("/auth/users/me/");
-      setUser(data);
+      const [userRes, sidebarRes] = await Promise.all([
+        api.get("/auth/users/me/"),
+        api.get("/permisos-sidebar/mis_secciones/"),
+      ]);
+      setUser(userRes.data);
+      setSidebarSections(sidebarRes.data.secciones || []);
     } catch {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       setUser(null);
+      setSidebarSections([]);
     } finally {
       setLoading(false);
     }
@@ -48,11 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     setUser(null);
+    setSidebarSections([]);
     router.push("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, sidebarSections, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

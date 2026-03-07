@@ -88,7 +88,7 @@ export function canViewAlerts(user: User | null): boolean {
 /** ¿El usuario puede gestionar (CRUD) esta sección? */
 export function canManage(
   user: User | null,
-  section: "menu" | "pedidos" | "mesas" | "cocina" | "inventario" | "estadisticas" | "limpieza" | "asistencia"
+  section: "menu" | "pedidos" | "mesas" | "cocina" | "inventario" | "estadisticas" | "limpieza" | "asistencia" | "costeo"
 ): boolean {
   if (!user) return false;
   if (user.is_staff || user.tipo_usuario === "comercio") return true;
@@ -102,6 +102,7 @@ export function canManage(
       return user.tipo_usuario === "cocinero";
     case "inventario":
     case "limpieza":
+    case "costeo":
       // mesero, cajero, cocinero can view but NOT create/edit/delete
       return false;
     case "menu":

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/permissions";
 import type { MenuItem, Category, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -24,6 +26,8 @@ import toast from "react-hot-toast";
 import clsx from "clsx";
 
 export default function MenuPage() {
+  const { user } = useAuth();
+  const canEdit = canManage(user, "menu");
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,13 +85,15 @@ export default function MenuPage() {
           <h1 className="text-2xl font-bold text-gray-900">Menú</h1>
           <p className="text-sm text-gray-500 mt-1">{totalCount} ítems en el menú</p>
         </div>
-        <button
-          onClick={() => { setEditItem(null); setShowAddModal(true); }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo Ítem
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => { setEditItem(null); setShowAddModal(true); }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo Ítem
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -148,20 +154,22 @@ export default function MenuPage() {
                   </span>
                 )}
                 {/* Actions overlay */}
-                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => { setEditItem(item); setShowAddModal(true); }}
-                    className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow-sm"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 rounded-lg bg-white/90 text-red-600 hover:bg-white shadow-sm"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                {canEdit && (
+                  <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => { setEditItem(item); setShowAddModal(true); }}
+                      className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow-sm"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 rounded-lg bg-white/90 text-red-600 hover:bg-white shadow-sm"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Content */}

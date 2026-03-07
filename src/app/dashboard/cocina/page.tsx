@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/permissions";
 import type { Pedido, PedidoDetalle } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -25,6 +27,8 @@ interface PedidoCocina extends Pedido {
 }
 
 export default function CocinaPage() {
+  const { user } = useAuth();
+  const canEdit = canManage(user, "cocina");
   const [pedidos, setPedidos] = useState<PedidoCocina[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -149,6 +153,7 @@ export default function CocinaPage() {
                     getElapsedTime={getElapsedTime}
                     onAction={handleAction}
                     actionLoading={actionLoading}
+                    canEdit={canEdit}
                   />
                 ))}
               </div>
@@ -170,6 +175,7 @@ export default function CocinaPage() {
                     getElapsedTime={getElapsedTime}
                     onAction={handleAction}
                     actionLoading={actionLoading}
+                    canEdit={canEdit}
                   />
                 ))}
               </div>
@@ -178,7 +184,6 @@ export default function CocinaPage() {
         </>
       )}
 
-      {/* Modal stock insuficiente */}
       {stockError && (
         <StockInsuficienteModal
           data={stockError}
@@ -196,11 +201,13 @@ function PedidoCard({
   getElapsedTime,
   onAction,
   actionLoading,
+  canEdit,
 }: {
   pedido: PedidoCocina;
   getElapsedTime: (d: string) => string;
   onAction: (id: number, action: string) => void;
   actionLoading: number | null;
+  canEdit: boolean;
 }) {
   const isLoading = actionLoading === pedido.id;
   const isConfirmado = pedido.estado === "confirmado";
@@ -262,7 +269,7 @@ function PedidoCard({
 
       {/* Actions */}
       <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
-        {isConfirmado && (
+        {canEdit && isConfirmado && (
           <button
             onClick={() => onAction(pedido.id, "preparar")}
             disabled={isLoading}
@@ -272,7 +279,7 @@ function PedidoCard({
             {isLoading ? "Procesando..." : "Iniciar Preparación"}
           </button>
         )}
-        {isEnPreparacion && (
+        {canEdit && isEnPreparacion && (
           <button
             onClick={() => onAction(pedido.id, "listo")}
             disabled={isLoading}

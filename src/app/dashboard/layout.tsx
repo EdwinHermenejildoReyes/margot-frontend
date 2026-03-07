@@ -6,28 +6,35 @@ import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { isInternal, canAccessRoute, ROLE_ROUTES } from "@/lib/permissions";
+import { isInternal } from "@/lib/permissions";
+
+/** Extrae la sección del pathname: /dashboard/cocina → "cocina", /dashboard → "dashboard" */
+function sectionFromPath(pathname: string): string {
+  const parts = pathname.replace(/^\/dashboard\/?/, "").split("/");
+  return parts[0] || "dashboard";
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sidebarSections } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return;
-    // No logueado → login
     if (!user) { router.push("/login"); return; }
-    // No es personal interno → login
     if (!isInternal(user)) { router.push("/login"); return; }
-    // No tiene acceso a esta ruta → primera ruta disponible del rol
-    if (!canAccessRoute(user, pathname)) {
-      const firstRoute = user.is_staff
-        ? "/dashboard"
-        : (ROLE_ROUTES[user.tipo_usuario]?.[0] || "/dashboard");
-      router.push(firstRoute);
-      return;
+
+    // Staff siempre tiene acceso total
+    if (user.is_staff) return;
+
+    const section = sectionFromPath(pathname);
+    if (!sidebarSections.includes(section)) {
+      // Redirigir a la primera sección permitida
+      const first = sidebarSections[0];
+      const route = first === "dashboard" ? "/dashboard" : `/dashboard/${first}`;
+      router.push(route);
     }
-  }, [loading, user, router, pathname]);
+  }, [loading, user, router, pathname, sidebarSections]);
 
   if (loading) return <LoadingSpinner className="min-h-screen" />;
   if (!user || !isInternal(user)) return null;

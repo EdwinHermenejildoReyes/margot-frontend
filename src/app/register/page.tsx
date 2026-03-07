@@ -35,8 +35,17 @@ export default function RegisterPage() {
       await api.post("/auth/users/", form);
       toast.success("Cuenta creada. Inicia sesión.");
       router.push("/login");
-    } catch {
-      toast.error("Error al crear la cuenta");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: Record<string, string[]> } };
+      const data = axiosErr.response?.data;
+      if (data && typeof data === "object") {
+        const messages = Object.entries(data)
+          .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+          .join("\n");
+        toast.error(messages || "Error al crear la cuenta", { duration: 5000 });
+      } else {
+        toast.error("Error al crear la cuenta");
+      }
     } finally {
       setLoading(false);
     }

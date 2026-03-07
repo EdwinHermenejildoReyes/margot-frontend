@@ -23,6 +23,8 @@ import {
   Loader2,
 } from "lucide-react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/permissions";
 import type {
   InventarioItem,
   PaginatedResponse,
@@ -66,6 +68,8 @@ const emptyExtra = (): ExtraCostRow => ({
 
 /* ─── Component ─── */
 export default function CosteoPage() {
+  const { user } = useAuth();
+  const canEdit = canManage(user, "costeo");
   const [nombreReceta, setNombreReceta] = useState("");
   const [porciones, setPorciones] = useState(1);
   const [ingredientes, setIngredientes] = useState<IngredientRow[]>([
@@ -378,23 +382,25 @@ export default function CosteoPage() {
               </span>
             )}
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !nombreReceta.trim()}
-            className={clsx(
-              "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
-              nombreReceta.trim()
-                ? "bg-brand-gold text-white hover:bg-brand-bronze shadow-sm"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            )}
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {editingId ? "Actualizar" : "Guardar"}
-          </button>
+          {canEdit && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !nombreReceta.trim()}
+              className={clsx(
+                "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
+                nombreReceta.trim()
+                  ? "bg-brand-gold text-white hover:bg-brand-bronze shadow-sm"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {editingId ? "Actualizar" : "Guardar"}
+            </button>
+          )}
           <button
             onClick={() => window.print()}
             className="px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 transition-colors"
@@ -468,12 +474,14 @@ export default function CosteoPage() {
                       <Edit3 className="h-3 w-3" />
                       Editar
                     </button>
-                    <button
-                      onClick={() => handleDeleteReceta(r.id)}
-                      className="p-1.5 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleDeleteReceta(r.id)}
+                        className="p-1.5 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-300" />
                 </div>

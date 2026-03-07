@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/permissions";
 import type { Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -38,6 +39,7 @@ const ESTADOS = [
 export default function PedidosPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const canCreatePedido = canManage(user, "pedidos");
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -133,13 +135,15 @@ export default function PedidosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
           <p className="text-sm text-gray-500 mt-1">{totalCount} pedidos</p>
         </div>
-        <Link
-          href="/dashboard/pedidos/nuevo"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo Pedido
-        </Link>
+        {canCreatePedido && (
+          <Link
+            href="/dashboard/pedidos/nuevo"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo Pedido
+          </Link>
+        )}
       </div>
 
       {/* Filters */}

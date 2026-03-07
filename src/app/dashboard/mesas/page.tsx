@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/permissions";
 import type { Mesa, Atencion, Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -18,6 +20,8 @@ const MESA_COLORS: Record<string, string> = {
 };
 
 export default function MesasPage() {
+  const { user } = useAuth();
+  const canEdit = canManage(user, "mesas");
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [pedidosPorAtencion, setPedidosPorAtencion] = useState<Record<number, Pedido[]>>({});
@@ -133,10 +137,10 @@ export default function MesasPage() {
               )}
             >
               <button
-                onClick={() => mesa.estado === "disponible" ? handleOpenAtencion(mesa) : undefined}
+                onClick={() => canEdit && mesa.estado === "disponible" ? handleOpenAtencion(mesa) : undefined}
                 className={clsx(
                   "w-full",
-                  mesa.estado === "disponible" && "cursor-pointer"
+                  canEdit && mesa.estado === "disponible" && "cursor-pointer"
                 )}
               >
                 <Armchair className="h-8 w-8 mx-auto mb-2 text-gray-600" />
@@ -165,13 +169,15 @@ export default function MesasPage() {
                     </Link>
                   ))}
                   {/* New pedido button */}
-                  <Link
-                    href={`/dashboard/pedidos/nuevo?mesa=${mesa.id}&atencion=${atencion.id}`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-gold text-white text-xs font-medium hover:bg-brand-bronze transition-colors"
-                  >
-                    <ShoppingCart className="h-3 w-3" />
-                    Nuevo Pedido
-                  </Link>
+                  {canEdit && (
+                    <Link
+                      href={`/dashboard/pedidos/nuevo?mesa=${mesa.id}&atencion=${atencion.id}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-gold text-white text-xs font-medium hover:bg-brand-bronze transition-colors"
+                    >
+                      <ShoppingCart className="h-3 w-3" />
+                      Nuevo Pedido
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

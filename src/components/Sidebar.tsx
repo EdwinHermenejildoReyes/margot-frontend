@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { ROLE_ROUTES, TIPO_LABELS } from "@/lib/permissions";
+import { TIPO_LABELS } from "@/lib/permissions";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -23,32 +23,30 @@ import {
 import { useState } from "react";
 import clsx from "clsx";
 
+/* Cada item tiene un `key` que coincide con la seccion del backend */
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Menú", href: "/dashboard/menu", icon: UtensilsCrossed },
-  { name: "Pedidos", href: "/dashboard/pedidos", icon: ShoppingCart },
-  { name: "Mesas", href: "/dashboard/mesas", icon: Armchair },
-  { name: "Cocina", href: "/dashboard/cocina", icon: ChefHat },
-  { name: "Inventario", href: "/dashboard/inventario", icon: Package },
-  { name: "Costeo", href: "/dashboard/costeo", icon: Calculator },
-  { name: "Estadísticas", href: "/dashboard/estadisticas", icon: BarChart3 },
-  { name: "Limpieza", href: "/dashboard/limpieza", icon: SprayCanIcon },
-  { name: "Asistencia", href: "/dashboard/asistencia", icon: Clock },
+  { key: "dashboard", name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { key: "menu", name: "Menú", href: "/dashboard/menu", icon: UtensilsCrossed },
+  { key: "pedidos", name: "Pedidos", href: "/dashboard/pedidos", icon: ShoppingCart },
+  { key: "mesas", name: "Mesas", href: "/dashboard/mesas", icon: Armchair },
+  { key: "cocina", name: "Cocina", href: "/dashboard/cocina", icon: ChefHat },
+  { key: "inventario", name: "Inventario", href: "/dashboard/inventario", icon: Package },
+  { key: "costeo", name: "Costeo", href: "/dashboard/costeo", icon: Calculator },
+  { key: "estadisticas", name: "Estadísticas", href: "/dashboard/estadisticas", icon: BarChart3 },
+  { key: "limpieza", name: "Limpieza", href: "/dashboard/limpieza", icon: SprayCanIcon },
+  { key: "asistencia", name: "Asistencia", href: "/dashboard/asistencia", icon: Clock },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, sidebarSections } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const NavContent = () => {
-    // Filtrar navegación según tipo_usuario
+    // Filtrar navegación según permisos del backend
     const allowedNav = navigation.filter((item) => {
       if (user?.is_staff) return true;
-      const routes = ROLE_ROUTES[user?.tipo_usuario || "cliente"] || [];
-      return routes.some(
-        (r) => item.href === r || item.href.startsWith(r + "/")
-      );
+      return sidebarSections.includes(item.key);
     });
 
     return (
