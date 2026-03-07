@@ -28,6 +28,7 @@ export interface StockErrorResponse {
 interface Props {
   data: StockErrorResponse;
   onClose: () => void;
+  action?: "confirmar" | "preparar";
 }
 
 const fmt = (n: number) =>
@@ -36,7 +37,7 @@ const fmt = (n: number) =>
     maximumFractionDigits: 3,
   });
 
-export default function StockInsuficienteModal({ data, onClose }: Props) {
+export default function StockInsuficienteModal({ data, onClose, action = "confirmar" }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
@@ -50,7 +51,7 @@ export default function StockInsuficienteModal({ data, onClose }: Props) {
               Stock Insuficiente
             </h2>
             <p className="text-sm text-red-600">
-              No se puede confirmar el pedido
+              No se puede {action === "preparar" ? "preparar" : "confirmar"} el pedido
             </p>
           </div>
           <button

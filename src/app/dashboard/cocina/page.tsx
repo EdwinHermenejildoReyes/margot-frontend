@@ -183,6 +183,7 @@ export default function CocinaPage() {
         <StockInsuficienteModal
           data={stockError}
           onClose={() => setStockError(null)}
+          action="preparar"
         />
       )}
     </div>

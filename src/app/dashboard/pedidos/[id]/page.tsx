@@ -96,6 +96,7 @@ export default function PedidoDetailPage() {
   const [menuLoading, setMenuLoading] = useState(false);
   const [notesOpenFor, setNotesOpenFor] = useState<number | null>(null);
   const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
+  const [stockAction, setStockAction] = useState<"confirmar" | "preparar">("confirmar");
 
   /* ── Fetch pedido ── */
   const fetchPedido = async () => {
@@ -136,6 +137,7 @@ export default function PedidoDetailPage() {
         axiosErr.response.data?.error === "stock_insuficiente"
       ) {
         setStockError(axiosErr.response.data);
+        setStockAction(action === "preparar" ? "preparar" : "confirmar");
       } else {
         toast.error(`Error al ${action} el pedido`);
       }
@@ -620,6 +622,7 @@ export default function PedidoDetailPage() {
         <StockInsuficienteModal
           data={stockError}
           onClose={() => setStockError(null)}
+          action={stockAction}
         />
       )}
 
