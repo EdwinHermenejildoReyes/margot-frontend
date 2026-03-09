@@ -67,6 +67,9 @@ export default function NuevoPedidoPage() {
   const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
   const [stockWarnings, setStockWarnings] = useState<Map<number, number>>(new Map()); // menuItemId → porciones_posibles
 
+  /* ── Empaque warning ── */
+  const [showEmpaqueWarning, setShowEmpaqueWarning] = useState(false);
+
   /* ── Empaques states ── */
   const [tiposEmpaque, setTiposEmpaque] = useState<TipoEmpaque[]>([]);
   const [cartEmpaques, setCartEmpaques] = useState<Map<number, number>>(new Map()); // tipoEmpaqueId → cantidad
@@ -241,7 +244,7 @@ export default function NuevoPedidoPage() {
   };
 
   /* ── Submit order ── */
-  const handleSubmit = async () => {
+  const handleSubmit = async (skipEmpaqueCheck = false) => {
     if (cart.length === 0) {
       toast.error("Agrega al menos un ítem al pedido");
       return;
@@ -249,6 +252,18 @@ export default function NuevoPedidoPage() {
 
     if (tipoEntrega === "local" && !mesaId) {
       toast.error("Selecciona una mesa para consumo en local");
+      return;
+    }
+
+    // Warn if "para llevar" or "domicilio" and no empaques selected
+    if (!skipEmpaqueCheck && tipoEntrega !== "local" && cartEmpaques.size === 0) {
+      setShowEmpaqueWarning(true);
+      return;
+    }
+
+    // Validate delivery cost for domicilio
+    if (tipoEntrega === "domicilio" && deliveryTotal <= 0) {
+      toast.error("Indica el costo de delivery para pedidos a domicilio");
       return;
     }
 
@@ -708,7 +723,7 @@ export default function NuevoPedidoPage() {
             <span className="text-xl font-bold text-brand-gold">${grandTotal.toFixed(2)}</span>
           </div>
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit()}
             disabled={saving || cart.length === 0}
             className="w-full py-3 px-4 rounded-xl bg-brand-gold text-white font-semibold text-sm hover:bg-brand-bronze focus:outline-none focus:ring-2 focus:ring-brand-gold focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
@@ -730,6 +745,41 @@ export default function NuevoPedidoPage() {
           data={stockError}
           onClose={() => setStockError(null)}
         />
+      )}
+
+      {/* ═══ EMPAQUE WARNING MODAL ═══ */}
+      {showEmpaqueWarning && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <Package className="w-5 h-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Sin empaques seleccionados</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              No has indicado la cantidad de empaques que vas a utilizar para este pedido.
+              ¿Deseas continuar sin empaques?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowEmpaqueWarning(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium"
+              >
+                Seleccionar empaques
+              </button>
+              <button
+                onClick={() => {
+                  setShowEmpaqueWarning(false);
+                  handleSubmit(true);
+                }}
+                className="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 font-medium"
+              >
+                Continuar sin empaques
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

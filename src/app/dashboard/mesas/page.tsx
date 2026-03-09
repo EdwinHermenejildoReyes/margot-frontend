@@ -7,7 +7,7 @@ import { canManage } from "@/lib/permissions";
 import type { Mesa, Atencion, Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil } from "lucide-react";
+import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil, DoorOpen } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -28,6 +28,7 @@ export default function MesasPage() {
   const [loading, setLoading] = useState(true);
   const [showAtencionModal, setShowAtencionModal] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
+  const [liberando, setLiberando] = useState<number | null>(null);
 
   const fetchMesas = async () => {
     try {
@@ -96,6 +97,22 @@ export default function MesasPage() {
   const handleOpenAtencion = (mesa: Mesa) => {
     setSelectedMesa(mesa);
     setShowAtencionModal(true);
+  };
+
+  const handleLiberar = async (atencionId: number) => {
+    if (!confirm("¿Liberar esta mesa? La atención se cerrará y la mesa quedará disponible.")) return;
+    setLiberando(atencionId);
+    try {
+      await api.post(`/atenciones/${atencionId}/liberar/`);
+      toast.success("Mesa liberada");
+      await fetchMesas();
+      const ats = await fetchAtenciones();
+      await fetchPedidosPorAtenciones(ats);
+    } catch {
+      toast.error("Error al liberar mesa");
+    } finally {
+      setLiberando(null);
+    }
   };
 
   const getMesaAtencion = (mesaId: number) => atenciones.find((a) => a.mesa === mesaId);
@@ -178,6 +195,17 @@ export default function MesasPage() {
                       Nuevo Pedido
                     </Link>
                   )}
+                  {/* Liberar mesa button */}
+                  {canEdit && (
+                    <button
+                      onClick={() => handleLiberar(atencion.id)}
+                      disabled={liberando === atencion.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
+                    >
+                      <DoorOpen className="h-3 w-3" />
+                      {liberando === atencion.id ? "Liberando..." : "Liberar Mesa"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -200,6 +228,7 @@ export default function MesasPage() {
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Comensales</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Llegada</th>
+                  {canEdit && <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -212,6 +241,18 @@ export default function MesasPage() {
                     <td className="px-6 py-3 text-sm text-gray-500">
                       {new Date(a.hora_llegada).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                     </td>
+                    {canEdit && (
+                      <td className="px-6 py-3">
+                        <button
+                          onClick={() => handleLiberar(a.id)}
+                          disabled={liberando === a.id}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
+                        >
+                          <DoorOpen className="h-3 w-3" />
+                          {liberando === a.id ? "Liberando..." : "Liberar"}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
