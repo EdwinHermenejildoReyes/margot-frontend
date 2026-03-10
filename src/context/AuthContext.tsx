@@ -31,11 +31,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]);
       setUser(userRes.data);
       setSidebarSections(sidebarRes.data.secciones || []);
-    } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      setUser(null);
-      setSidebarSections([]);
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setUser(null);
+        setSidebarSections([]);
+      }
     } finally {
       setLoading(false);
     }
