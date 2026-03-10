@@ -16,16 +16,11 @@ export default function RegisterPage() {
     first_name: "",
     last_name: "",
     tipo_usuario: "comercio" as const,
-    is_staff: false,
   });
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleCheck = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.checked });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -105,20 +100,6 @@ export default function RegisterPage() {
                 <option value="repartidor">Repartidor</option>
               </select>
             </div>
-
-            <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-300 cursor-pointer hover:border-brand-gold transition-colors">
-              <input
-                type="checkbox"
-                name="is_staff"
-                checked={form.is_staff}
-                onChange={handleCheck}
-                className="h-4 w-4 rounded border-gray-300 text-brand-gold focus:ring-brand-gold"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Administrador (Staff)</span>
-                <p className="text-xs text-gray-400">Acceso al panel de administración</p>
-              </div>
-            </label>
 
             <button type="submit" disabled={loading} className="w-full py-2.5 px-4 rounded-lg bg-brand-gold text-white font-medium text-sm hover:bg-brand-bronze disabled:opacity-50 transition-colors">
               {loading ? "Creando cuenta..." : "Registrarse"}
