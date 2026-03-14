@@ -101,12 +101,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          {/* <p className="text-center text-sm text-gray-500 mt-6">
             ¿No tienes cuenta?{" "}
             <Link href="/register" className="text-brand-gold hover:text-brand-bronze font-medium">
               Regístrate
             </Link>
-          </p>
+          </p> */}
         </div>
       </div>
     </div>
