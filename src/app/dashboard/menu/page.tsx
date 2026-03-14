@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/permissions";
@@ -21,12 +22,14 @@ import {
   ChevronRight,
   Upload,
   ImageIcon,
+  Sparkles,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
 export default function MenuPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const canEdit = canManage(user, "menu");
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -85,15 +88,26 @@ export default function MenuPage() {
           <h1 className="text-2xl font-bold text-gray-900">Menú</h1>
           <p className="text-sm text-gray-500 mt-1">{totalCount} ítems en el menú</p>
         </div>
-        {canEdit && (
-          <button
-            onClick={() => { setEditItem(null); setShowAddModal(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo Ítem
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {canEdit && (
+            <button
+              onClick={() => router.push("/dashboard/promociones")}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              Promociones
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => { setEditItem(null); setShowAddModal(true); }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-gold text-white rounded-lg text-sm font-medium hover:bg-brand-bronze transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo Ítem
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

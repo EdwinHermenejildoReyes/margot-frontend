@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { MenuItem, Category, PaginatedResponse } from "@/lib/types";
+import type { MenuItem, Category, PaginatedResponse, Promocion } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
@@ -21,6 +21,7 @@ import {
   Search,
   UtensilsCrossed,
   StickyNote,
+  Sparkles,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StockInsuficienteModal, {
@@ -40,6 +41,17 @@ interface DetallePedido {
   notas?: string;
 }
 
+interface PromocionPedido {
+  id: number;
+  promocion: number;
+  promocion_nombre: string;
+  promocion_tipo: string;
+  promocion_tipo_display: string;
+  cantidad: number;
+  precio_unitario: string;
+  subtotal: string;
+}
+
 interface PedidoDetail {
   id: number;
   numero_pedido: string;
@@ -56,6 +68,7 @@ interface PedidoDetail {
   mesa?: number;
   atencion?: number;
   detalles: DetallePedido[];
+  promociones?: PromocionPedido[];
   pagos: Array<{
     id: number;
     metodo_pago: string;
@@ -72,6 +85,13 @@ interface EditItem {
   notas: string;
 }
 
+interface EditPromo {
+  promocion_id: number;
+  nombre: string;
+  precio: number;
+  cantidad: number;
+}
+
 /* ── Component ── */
 
 export default function PedidoDetailPage() {
@@ -84,6 +104,7 @@ export default function PedidoDetailPage() {
   /* edit mode */
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<EditItem[]>([]);
+  const [editPromos, setEditPromos] = useState<EditPromo[]>([]);
   const [editNotas, setEditNotas] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -91,8 +112,9 @@ export default function PedidoDetailPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [allPromos, setAllPromos] = useState<Promocion[]>([]);
   const [menuSearch, setMenuSearch] = useState("");
-  const [menuCategory, setMenuCategory] = useState<number | null>(null);
+  const [menuCategory, setMenuCategory] = useState<number | "promociones" | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
   const [notesOpenFor, setNotesOpenFor] = useState<number | null>(null);
   const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
@@ -156,6 +178,14 @@ export default function PedidoDetailPage() {
         notas: d.notas || "",
       }))
     );
+    setEditPromos(
+      (pedido.promociones || []).map((p) => ({
+        promocion_id: p.promocion,
+        nombre: p.promocion_nombre,
+        precio: parseFloat(p.precio_unitario),
+        cantidad: p.cantidad,
+      }))
+    );
     setEditNotas(pedido.notas || "");
     setEditing(true);
   };
@@ -163,6 +193,7 @@ export default function PedidoDetailPage() {
   const cancelEditing = () => {
     setEditing(false);
     setEditItems([]);
+    setEditPromos([]);
     setShowAddModal(false);
   };
 
@@ -208,15 +239,47 @@ export default function PedidoDetailPage() {
     toast.success(`${menuItem.name} agregado`);
   };
 
+  const addPromoFromList = (promo: Promocion) => {
+    const precio = promo.tipo === "adicional"
+      ? parseFloat(promo.precio_extra || "0")
+      : parseFloat(promo.precio_promocional || "0");
+    setEditPromos((prev) => {
+      const existing = prev.findIndex((e) => e.promocion_id === promo.id);
+      if (existing >= 0) {
+        return prev.map((item, i) =>
+          i === existing ? { ...item, cantidad: item.cantidad + 1 } : item
+        );
+      }
+      return [...prev, { promocion_id: promo.id, nombre: promo.nombre, precio, cantidad: 1 }];
+    });
+    toast.success(`${promo.nombre} agregado`);
+  };
+
+  const updatePromoQty = (idx: number, delta: number) => {
+    setEditPromos((prev) =>
+      prev
+        .map((item, i) =>
+          i === idx ? { ...item, cantidad: Math.max(0, item.cantidad + delta) } : item
+        )
+        .filter((item) => item.cantidad > 0)
+    );
+  };
+
+  const removePromo = (idx: number) => {
+    setEditPromos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const editTotal = useMemo(
-    () => editItems.reduce((sum, item) => sum + item.price * item.cantidad, 0),
-    [editItems]
+    () =>
+      editItems.reduce((sum, item) => sum + item.price * item.cantidad, 0) +
+      editPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0),
+    [editItems, editPromos]
   );
 
   /* ── Save edits ── */
   const saveEdits = async () => {
-    if (editItems.length === 0) {
-      toast.error("El pedido debe tener al menos un ítem");
+    if (editItems.length === 0 && editPromos.length === 0) {
+      toast.error("El pedido debe tener al menos un ítem o promoción");
       return;
     }
     setSaving(true);
@@ -227,6 +290,10 @@ export default function PedidoDetailPage() {
           menu_item: item.menu_item_id,
           cantidad: item.cantidad,
           notas: item.notas || "",
+        })),
+        promociones: editPromos.map((p) => ({
+          promocion: p.promocion_id,
+          cantidad: p.cantidad,
         })),
       });
       setPedido(data);
@@ -245,12 +312,14 @@ export default function PedidoDetailPage() {
     if (menuItems.length === 0) {
       setMenuLoading(true);
       try {
-        const [menuRes, catRes] = await Promise.all([
+        const [menuRes, catRes, promosRes] = await Promise.all([
           api.get<PaginatedResponse<MenuItem>>("/menu-items/?page_size=200&is_available=true"),
           api.get<PaginatedResponse<Category>>("/categorias/?page_size=50"),
+          api.get("/promociones/vigentes/"),
         ]);
         setMenuItems(menuRes.data.results || []);
         setCategories(catRes.data.results || []);
+        setAllPromos(Array.isArray(promosRes.data) ? promosRes.data : promosRes.data.results || []);
       } catch {
         toast.error("Error al cargar el menú");
       } finally {
@@ -260,6 +329,7 @@ export default function PedidoDetailPage() {
   };
 
   const filteredMenu = useMemo(() => {
+    if (menuCategory === "promociones") return [];
     let items = menuItems;
     if (menuCategory) items = items.filter((i) => i.category === menuCategory);
     if (menuSearch.trim()) {
@@ -268,6 +338,13 @@ export default function PedidoDetailPage() {
     }
     return items;
   }, [menuItems, menuCategory, menuSearch]);
+
+  const filteredModalPromos = useMemo(() => {
+    if (menuCategory !== null && menuCategory !== "promociones") return [];
+    if (!menuSearch.trim()) return allPromos;
+    const q = menuSearch.toLowerCase();
+    return allPromos.filter((p) => p.nombre.toLowerCase().includes(q));
+  }, [allPromos, menuCategory, menuSearch]);
 
   /* ── Render ── */
   if (loading) return <LoadingSpinner className="min-h-[50vh]" />;
@@ -434,8 +511,28 @@ export default function PedidoDetailPage() {
                   <span className="text-sm font-semibold text-gray-900">${det.subtotal}</span>
                 </div>
               ))}
-              {(!pedido.detalles || pedido.detalles.length === 0) && (
-                <div className="px-6 py-8 text-center text-sm text-gray-400">Sin detalles</div>
+              {/* Promotions in view mode */}
+              {pedido.promociones && pedido.promociones.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-purple-50 flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="text-xs font-semibold text-purple-700 uppercase">Promociones</span>
+                  </div>
+                  {pedido.promociones.map((pp) => (
+                    <div key={`promo-${pp.id}`} className="px-6 py-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{pp.promocion_nombre}</p>
+                        <p className="text-xs text-purple-500">
+                          {pp.promocion_tipo_display} · Cantidad: {pp.cantidad} × ${pp.precio_unitario}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">${pp.subtotal}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {(!pedido.detalles || pedido.detalles.length === 0) && (!pedido.promociones || pedido.promociones.length === 0) && (
+                <div className="px-6 py-8 text-center text-sm text-gray-400">Sin ítems</div>
               )}
             </div>
           )}
@@ -443,11 +540,6 @@ export default function PedidoDetailPage() {
           {/* ── Edit mode ── */}
           {editing && (
             <div className="divide-y divide-gray-100">
-              {editItems.length === 0 && (
-                <div className="px-6 py-8 text-center text-sm text-gray-400">
-                  Sin ítems. Agrega al menos uno para guardar.
-                </div>
-              )}
               {editItems.map((item, idx) => (
                 <div key={`${item.menu_item_id}-${idx}`} className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -519,6 +611,56 @@ export default function PedidoDetailPage() {
                   )}
                 </div>
               ))}
+
+              {/* Promotions in edit mode */}
+              {editPromos.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-purple-50 flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="text-xs font-semibold text-purple-700 uppercase">Promociones</span>
+                  </div>
+                  {editPromos.map((p, idx) => (
+                    <div key={`edit-promo-${p.promocion_id}-${idx}`} className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{p.nombre}</p>
+                          <p className="text-xs text-purple-500">${p.precio.toFixed(2)} c/u</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => updatePromoQty(idx, -1)}
+                            className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="text-sm font-semibold w-8 text-center">{p.cantidad}</span>
+                          <button
+                            onClick={() => updatePromoQty(idx, 1)}
+                            className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900 w-20 text-right">
+                          ${(p.precio * p.cantidad).toFixed(2)}
+                        </p>
+                        <button
+                          onClick={() => removePromo(idx)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {editItems.length === 0 && editPromos.length === 0 && (
+                <div className="px-6 py-8 text-center text-sm text-gray-400">
+                  Sin ítems. Agrega al menos uno para guardar.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -679,6 +821,19 @@ export default function PedidoDetailPage() {
                     {cat.name}
                   </button>
                 ))}
+                {allPromos.length > 0 && (
+                  <button
+                    onClick={() => setMenuCategory("promociones")}
+                    className={
+                      menuCategory === "promociones"
+                        ? "px-3 py-1 rounded-full text-xs font-medium bg-purple-600 text-white flex items-center gap-1"
+                        : "px-3 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 flex items-center gap-1"
+                    }
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Promos
+                  </button>
+                )}
               </div>
             </div>
 
@@ -686,51 +841,101 @@ export default function PedidoDetailPage() {
             <div className="flex-1 overflow-y-auto p-4">
               {menuLoading ? (
                 <LoadingSpinner />
-              ) : filteredMenu.length === 0 ? (
+              ) : filteredMenu.length === 0 && filteredModalPromos.length === 0 ? (
                 <div className="text-center py-12">
                   <UtensilsCrossed className="h-10 w-10 text-gray-200 mx-auto mb-3" />
                   <p className="text-sm text-gray-400">No se encontraron ítems</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {filteredMenu.map((mi) => {
-                    const inEdit = editItems.find(
-                      (e) => e.menu_item_id === mi.id
-                    );
-                    return (
-                      <button
-                        key={mi.id}
-                        onClick={() => addItemFromMenu(mi)}
-                        className={
-                          inEdit
-                            ? "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-brand-gold bg-brand-sage/30"
-                            : "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-gray-200 bg-white hover:border-brand-gold/50"
-                        }
-                      >
-                        <div className="h-10 w-10 rounded-lg bg-brand-sage flex items-center justify-center flex-shrink-0">
-                          <UtensilsCrossed className="h-5 w-5 text-brand-dark" />
+                <div className="space-y-4">
+                  {/* Promotions grid in modal */}
+                  {filteredModalPromos.length > 0 && (
+                    <div>
+                      {filteredMenu.length > 0 && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                          <span className="text-xs font-semibold text-purple-700 uppercase">Promociones</span>
+                          <div className="flex-1 border-t border-purple-200" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {mi.name}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {mi.category_name}
-                          </p>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {filteredModalPromos.map((promo) => {
+                          const inEdit = editPromos.find((e) => e.promocion_id === promo.id);
+                          const precio = promo.tipo === "adicional"
+                            ? parseFloat(promo.precio_extra || "0")
+                            : parseFloat(promo.precio_promocional || "0");
+                          return (
+                            <button
+                              key={`promo-${promo.id}`}
+                              onClick={() => addPromoFromList(promo)}
+                              className={
+                                inEdit
+                                  ? "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-purple-500 bg-purple-50"
+                                  : "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-gray-200 bg-white hover:border-purple-300"
+                              }
+                            >
+                              <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                                <Sparkles className="h-5 w-5 text-purple-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{promo.nombre}</p>
+                                <p className="text-xs text-purple-500">{promo.tipo_display}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm font-bold text-purple-600">${precio.toFixed(2)}</p>
+                                {inEdit && (
+                                  <span className="text-xs text-purple-500">×{inEdit.cantidad}</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Menu items grid in modal */}
+                  {filteredMenu.length > 0 && (
+                    <div>
+                      {filteredModalPromos.length > 0 && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <UtensilsCrossed className="h-3.5 w-3.5 text-gray-400" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Ítems del menú</span>
+                          <div className="flex-1 border-t border-gray-200" />
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-brand-gold">
-                            ${mi.price}
-                          </p>
-                          {inEdit && (
-                            <span className="text-xs text-brand-bronze">
-                              ×{inEdit.cantidad}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {filteredMenu.map((mi) => {
+                          const inEdit = editItems.find((e) => e.menu_item_id === mi.id);
+                          return (
+                            <button
+                              key={mi.id}
+                              onClick={() => addItemFromMenu(mi)}
+                              className={
+                                inEdit
+                                  ? "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-brand-gold bg-brand-sage/30"
+                                  : "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-gray-200 bg-white hover:border-brand-gold/50"
+                              }
+                            >
+                              <div className="h-10 w-10 rounded-lg bg-brand-sage flex items-center justify-center flex-shrink-0">
+                                <UtensilsCrossed className="h-5 w-5 text-brand-dark" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{mi.name}</p>
+                                <p className="text-xs text-gray-400">{mi.category_name}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm font-bold text-brand-gold">${mi.price}</p>
+                                {inEdit && (
+                                  <span className="text-xs text-brand-bronze">×{inEdit.cantidad}</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -738,7 +943,7 @@ export default function PedidoDetailPage() {
             {/* Footer */}
             <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex items-center justify-between">
               <p className="text-sm text-gray-500">
-                {editItems.length} ítem{editItems.length !== 1 ? "s" : ""} ·
+                {editItems.length + editPromos.length} ítem{editItems.length + editPromos.length !== 1 ? "s" : ""} ·
                 Total:{" "}
                 <span className="font-semibold text-brand-gold">
                   ${editTotal.toFixed(2)}

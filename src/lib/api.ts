@@ -1,12 +1,12 @@
 import axios from "axios";
 
-// PC (localhost) → connect directly to Django on port 8004
-// Mobile/other devices → use Next.js proxy (they can't reach port 8004)
+// PC (localhost) → connect directly to nginx on port 8005
+// Mobile/other devices → use Next.js proxy (they can't reach port 8005)
 function getBaseURL(): string {
-  if (typeof window === "undefined") return "http://localhost:8004/api/v1";
+  if (typeof window === "undefined") return "http://localhost:8005/api/v1";
   const h = window.location.hostname;
   if (h === "localhost" || h === "127.0.0.1") {
-    return "http://localhost:8004/api/v1";
+    return "http://localhost:8005/api/v1";
   }
   return "/api/v1"; // goes through Next.js rewrite proxy
 }

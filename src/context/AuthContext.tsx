@@ -47,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { fetchUser(); }, []);
 
   const login = async (username: string, password: string) => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     const { data } = await api.post("/auth/jwt/create/", { username, password });
     localStorage.setItem("access_token", data.access);
     localStorage.setItem("refresh_token", data.refresh);

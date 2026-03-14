@@ -80,6 +80,7 @@ export interface Pedido {
   notas?: string;
   created_at: string;
   detalles?: PedidoDetalle[];
+  promociones?: PedidoPromocion[];
   empaques?: PedidoEmpaque[];
 }
 
@@ -92,6 +93,45 @@ export interface PedidoDetalle {
   precio_unitario: string;
   subtotal: string;
   notas?: string;
+}
+
+export interface PromocionItem {
+  id?: number;
+  rol: "aplica" | "adicional";
+  menu_item?: number;
+  menu_item_nombre?: string;
+  category?: number;
+  category_nombre?: string;
+  cantidad: number;
+  precio_filtro?: string;
+}
+
+export interface Promocion {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  tipo: "nxm" | "combo" | "adicional";
+  tipo_display: string;
+  is_active: boolean;
+  vigente: boolean;
+  precio_promocional?: string;
+  precio_extra?: string;
+  cantidad_requerida?: number;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  items?: PromocionItem[];
+  created_at?: string;
+}
+
+export interface PedidoPromocion {
+  id: number;
+  promocion: number;
+  promocion_nombre: string;
+  promocion_tipo: string;
+  promocion_tipo_display: string;
+  cantidad: number;
+  precio_unitario: string;
+  subtotal: string;
 }
 
 export interface TipoEmpaque {

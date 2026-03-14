@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const { login } = useAuth();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -28,8 +28,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await api.post("/auth/users/", form);
-      toast.success("Cuenta creada. Inicia sesión.");
-      router.push("/login");
+      toast.success("¡Cuenta creada exitosamente!");
+      await login(form.username, form.password);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: Record<string, string[]> } };
       const data = axiosErr.response?.data;

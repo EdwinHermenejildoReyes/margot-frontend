@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import api from "@/lib/api";
-import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque } from "@/lib/types";
+import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque, Promocion } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Package,
   Truck,
+  Sparkles,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -35,6 +36,11 @@ interface CartItem {
   notas: string;
 }
 
+interface CartPromo {
+  promocion: Promocion;
+  cantidad: number;
+}
+
 export default function NuevoPedidoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,10 +54,12 @@ export default function NuevoPedidoPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
+  const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* ── Form states ── */
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartPromos, setCartPromos] = useState<CartPromo[]>([]);
   const [tipoEntrega, setTipoEntrega] = useState<string>(preselectedMesa ? "local" : "local");
   const [mesaId, setMesaId] = useState<number | "">(preselectedMesa ? Number(preselectedMesa) : "");
   const [atencionId, setAtencionId] = useState<number | "">(preselectedAtencion ? Number(preselectedAtencion) : "");
@@ -60,7 +68,7 @@ export default function NuevoPedidoPage() {
 
   /* ── Filter states ── */
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<number | "promociones" | null>(null);
   const [showNotesFor, setShowNotesFor] = useState<number | null>(null);
 
   /* ── Stock check ── */
@@ -79,18 +87,20 @@ export default function NuevoPedidoPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [menuRes, catRes, mesasRes, atencionesRes, empaquesRes] = await Promise.all([
+        const [menuRes, catRes, mesasRes, atencionesRes, empaquesRes, promosRes] = await Promise.all([
           api.get<PaginatedResponse<MenuItem>>("/menu-items/?page_size=200&is_available=true"),
           api.get<PaginatedResponse<Category>>("/categorias/?page_size=50"),
           api.get<PaginatedResponse<Mesa>>("/mesas/"),
           api.get("/atenciones/activas/"),
           api.get<PaginatedResponse<TipoEmpaque>>("/tipos-empaque/?page_size=50"),
+          api.get("/promociones/vigentes/"),
         ]);
         setMenuItems(menuRes.data.results || []);
         setCategories(catRes.data.results || []);
         setMesas(mesasRes.data.results || []);
         setAtenciones(Array.isArray(atencionesRes.data) ? atencionesRes.data : atencionesRes.data.results || []);
         setTiposEmpaque(empaquesRes.data.results || []);
+        setPromociones(Array.isArray(promosRes.data) ? promosRes.data : promosRes.data.results || []);
       } catch {
         toast.error("Error al cargar datos");
       } finally {
@@ -102,6 +112,7 @@ export default function NuevoPedidoPage() {
 
   /* ── Filtered & grouped menu items ── */
   const groupedItems = useMemo(() => {
+    if (selectedCategory === "promociones") return [];
     let items = menuItems;
     if (selectedCategory) {
       items = items.filter((i) => i.category === selectedCategory);
@@ -135,6 +146,16 @@ export default function NuevoPedidoPage() {
     () => groupedItems.reduce((sum, g) => sum + g.items.length, 0),
     [groupedItems]
   );
+
+  /* ── Filtered promociones ── */
+  const filteredPromos = useMemo(() => {
+    if (selectedCategory !== "promociones" && selectedCategory !== null) return [];
+    if (!searchQuery.trim()) return promociones;
+    const q = searchQuery.toLowerCase();
+    return promociones.filter(
+      (p) => p.nombre.toLowerCase().includes(q) || p.descripcion?.toLowerCase().includes(q)
+    );
+  }, [promociones, selectedCategory, searchQuery]);
 
   /* ── Cart helpers ── */
   const addToCart = async (item: MenuItem) => {
@@ -212,6 +233,44 @@ export default function NuevoPedidoPage() {
 
   const cartCount = useMemo(() => cart.reduce((sum, c) => sum + c.cantidad, 0), [cart]);
 
+  /* ── Promo cart helpers ── */
+  const addPromoToCart = (promo: Promocion) => {
+    setCartPromos((prev) => {
+      const existing = prev.find((p) => p.promocion.id === promo.id);
+      if (existing) {
+        return prev.map((p) =>
+          p.promocion.id === promo.id ? { ...p, cantidad: p.cantidad + 1 } : p
+        );
+      }
+      return [...prev, { promocion: promo, cantidad: 1 }];
+    });
+  };
+
+  const removePromoFromCart = (promoId: number) => {
+    setCartPromos((prev) => prev.filter((p) => p.promocion.id !== promoId));
+  };
+
+  const updatePromoQuantity = (promoId: number, delta: number) => {
+    setCartPromos((prev) =>
+      prev
+        .map((p) =>
+          p.promocion.id === promoId ? { ...p, cantidad: Math.max(0, p.cantidad + delta) } : p
+        )
+        .filter((p) => p.cantidad > 0)
+    );
+  };
+
+  const promoPrice = (p: Promocion) =>
+    p.tipo === "adicional"
+      ? parseFloat(p.precio_extra || "0")
+      : parseFloat(p.precio_promocional || "0");
+
+  const promosTotal = useMemo(
+    () => cartPromos.reduce((sum, cp) => sum + promoPrice(cp.promocion) * cp.cantidad, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cartPromos]
+  );
+
   const empaquesTotal = useMemo(() => {
     let total = 0;
     cartEmpaques.forEach((cantidad, tipoId) => {
@@ -227,8 +286,8 @@ export default function NuevoPedidoPage() {
   );
 
   const grandTotal = useMemo(
-    () => cartTotal + empaquesTotal + deliveryTotal,
-    [cartTotal, empaquesTotal, deliveryTotal]
+    () => cartTotal + promosTotal + empaquesTotal + deliveryTotal,
+    [cartTotal, promosTotal, empaquesTotal, deliveryTotal]
   );
 
   /* ── Empaques helpers ── */
@@ -245,8 +304,8 @@ export default function NuevoPedidoPage() {
 
   /* ── Submit order ── */
   const handleSubmit = async (skipEmpaqueCheck = false) => {
-    if (cart.length === 0) {
-      toast.error("Agrega al menos un ítem al pedido");
+    if (cart.length === 0 && cartPromos.length === 0) {
+      toast.error("Agrega al menos un ítem o promoción al pedido");
       return;
     }
 
@@ -276,6 +335,10 @@ export default function NuevoPedidoPage() {
           menu_item: c.menuItem.id,
           cantidad: c.cantidad,
           notas: c.notas || undefined,
+        })),
+        promociones: cartPromos.map((cp) => ({
+          promocion: cp.promocion.id,
+          cantidad: cp.cantidad,
         })),
       };
 
@@ -380,18 +443,81 @@ export default function NuevoPedidoPage() {
                 {cat.name}
               </button>
             ))}
+            {promociones.length > 0 && (
+              <button
+                onClick={() => setSelectedCategory("promociones")}
+                className={clsx(
+                  "px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1",
+                  selectedCategory === "promociones"
+                    ? "bg-purple-600 text-white"
+                    : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                )}
+              >
+                <Sparkles className="h-3 w-3" />
+                Promociones
+              </button>
+            )}
           </div>
         </div>
 
         {/* Menu Items Grid – grouped by category */}
         <div className="flex-1 overflow-y-auto pr-1 min-h-[50vh] lg:min-h-0">
-          {totalFilteredItems === 0 ? (
+          {totalFilteredItems === 0 && filteredPromos.length === 0 ? (
             <div className="text-center py-16">
               <UtensilsCrossed className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-400">No se encontraron ítems</p>
             </div>
           ) : (
             <div className="space-y-6">
+              {/* ── Promociones section ── */}
+              {filteredPromos.length > 0 && (selectedCategory === null || selectedCategory === "promociones") && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 py-2 -mx-1 px-1">
+                    <Sparkles className="h-4 w-4 text-purple-500" />
+                    <h3 className="text-sm font-bold text-purple-700 uppercase tracking-wide">
+                      Promociones
+                    </h3>
+                    <span className="text-xs text-gray-400">
+                      ({filteredPromos.length})
+                    </span>
+                    <div className="flex-1 border-t border-purple-200 ml-2" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {filteredPromos.map((promo) => {
+                      const inCart = cartPromos.find((cp) => cp.promocion.id === promo.id);
+                      const precio = promoPrice(promo);
+                      return (
+                        <button
+                          key={`promo-${promo.id}`}
+                          onClick={() => addPromoToCart(promo)}
+                          className={clsx(
+                            "relative flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-md",
+                            inCart
+                              ? "border-purple-500 bg-purple-50"
+                              : "border-gray-200 bg-white hover:border-purple-300"
+                          )}
+                        >
+                          <div className="h-14 w-14 rounded-lg bg-purple-100 flex-shrink-0 flex items-center justify-center">
+                            <Sparkles className="h-6 w-6 text-purple-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{promo.nombre}</p>
+                            <p className="text-xs text-purple-500 truncate">{promo.tipo_display}</p>
+                            <p className="text-sm font-bold text-purple-600 mt-0.5">${precio.toFixed(2)}</p>
+                          </div>
+                          {inCart && (
+                            <span className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center shadow">
+                              {inCart.cantidad}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Menu items by category ── */}
               {groupedItems.map((group) => (
                 <div key={group.category.id}>
                   {/* Category heading */}
@@ -473,7 +599,7 @@ export default function NuevoPedidoPage() {
             <h2 className="font-semibold text-gray-900">Pedido</h2>
           </div>
           <span className="text-xs bg-brand-sage text-brand-dark px-2 py-0.5 rounded-full font-medium">
-            {cartCount} {cartCount === 1 ? "ítem" : "ítems"}
+            {cartCount + cartPromos.reduce((s, p) => s + p.cantidad, 0)} {cartCount + cartPromos.reduce((s, p) => s + p.cantidad, 0) === 1 ? "ítem" : "ítems"}
           </span>
         </div>
 
@@ -610,11 +736,11 @@ export default function NuevoPedidoPage() {
 
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
-          {cart.length === 0 ? (
+          {cart.length === 0 && cartPromos.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingCart className="h-10 w-10 text-gray-200 mx-auto mb-3" />
               <p className="text-sm text-gray-400">Agrega ítems del menú</p>
-              <p className="text-xs text-gray-300 mt-1">Haz clic en un plato para agregarlo</p>
+              <p className="text-xs text-gray-300 mt-1">Haz clic en un plato o promoción para agregarlo</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -684,6 +810,60 @@ export default function NuevoPedidoPage() {
                   )}
                 </div>
               ))}
+
+              {/* ── Promo items in cart ── */}
+              {cartPromos.length > 0 && (
+                <>
+                  {cart.length > 0 && (
+                    <div className="flex items-center gap-2 pt-2">
+                      <Sparkles className="h-3 w-3 text-purple-500" />
+                      <span className="text-xs font-semibold text-purple-600 uppercase">Promociones</span>
+                      <div className="flex-1 border-t border-purple-200" />
+                    </div>
+                  )}
+                  {cartPromos.map((cp) => {
+                    const precio = promoPrice(cp.promocion);
+                    return (
+                      <div key={`promo-${cp.promocion.id}`} className="group">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {cp.promocion.nombre}
+                            </p>
+                            <p className="text-xs text-purple-500">
+                              ${precio.toFixed(2)} c/u · {cp.promocion.tipo_display}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => updatePromoQuantity(cp.promocion.id, -1)}
+                              className="h-7 w-7 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="text-sm font-semibold w-6 text-center">{cp.cantidad}</span>
+                            <button
+                              onClick={() => updatePromoQuantity(cp.promocion.id, 1)}
+                              className="h-7 w-7 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-900 w-16 text-right">
+                            ${(precio * cp.cantidad).toFixed(2)}
+                          </p>
+                          <button
+                            onClick={() => removePromoFromCart(cp.promocion.id)}
+                            className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -703,9 +883,15 @@ export default function NuevoPedidoPage() {
         {/* Total & Submit */}
         <div className="px-5 py-4 border-t border-gray-200 bg-gray-50/50 rounded-b-xl space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Subtotal</span>
+            <span className="text-sm text-gray-500">Subtotal Ítems</span>
             <span className="text-sm text-gray-700">${cartTotal.toFixed(2)}</span>
           </div>
+          {promosTotal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Promociones</span>
+              <span className="text-sm text-purple-600">${promosTotal.toFixed(2)}</span>
+            </div>
+          )}
           {empaquesTotal > 0 && (
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Empaques</span>
@@ -724,7 +910,7 @@ export default function NuevoPedidoPage() {
           </div>
           <button
             onClick={() => handleSubmit()}
-            disabled={saving || cart.length === 0}
+            disabled={saving || (cart.length === 0 && cartPromos.length === 0)}
             className="w-full py-3 px-4 rounded-xl bg-brand-gold text-white font-semibold text-sm hover:bg-brand-bronze focus:outline-none focus:ring-2 focus:ring-brand-gold focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {saving ? (
