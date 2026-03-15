@@ -79,8 +79,8 @@ export default function NuevoPedidoPage() {
   /* ── Empaque warning ── */
   const [showEmpaqueWarning, setShowEmpaqueWarning] = useState(false);
 
-  /* ── Adicional promo selection modal ── */
-  const [adicionalPromo, setAdicionalPromo] = useState<Promocion | null>(null);
+  /* ── Adicional/NxM promo selection modal ── */
+  const [selectionPromo, setSelectionPromo] = useState<Promocion | null>(null);
 
   /* ── Empaques states ── */
   const [tiposEmpaque, setTiposEmpaque] = useState<TipoEmpaque[]>([]);
@@ -238,10 +238,16 @@ export default function NuevoPedidoPage() {
   const cartCount = useMemo(() => cart.reduce((sum, c) => sum + c.cantidad, 0), [cart]);
 
   /* ── Promo cart helpers ── */
+  const promoNeedsSelection = (promo: Promocion) => {
+    if (promo.tipo === "adicional") return true;
+    // NxM promos that reference a category (not specific menu_item) need selection
+    if (promo.tipo === "nxm" && promo.items?.some((i) => i.rol === "aplica" && i.category && !i.menu_item)) return true;
+    return false;
+  };
+
   const addPromoToCart = (promo: Promocion) => {
-    // For "adicional" promos, open selection modal to pick trigger item
-    if (promo.tipo === "adicional") {
-      setAdicionalPromo(promo);
+    if (promoNeedsSelection(promo)) {
+      setSelectionPromo(promo);
       return;
     }
     setCartPromos((prev) => {
@@ -255,9 +261,8 @@ export default function NuevoPedidoPage() {
     });
   };
 
-  const addAdicionalPromoWithItem = (promo: Promocion, item: MenuItem) => {
+  const addPromoWithSelectedItem = (promo: Promocion, item: MenuItem) => {
     setCartPromos((prev) => {
-      // For adicional promos, each different selected item is a separate cart entry
       const existing = prev.find(
         (p) => p.promocion.id === promo.id && p.selectedItem?.id === item.id
       );
@@ -270,20 +275,26 @@ export default function NuevoPedidoPage() {
       }
       return [...prev, { promocion: promo, cantidad: 1, selectedItem: item }];
     });
-    setAdicionalPromo(null);
+    setSelectionPromo(null);
   };
 
-  // Items available for the adicional selection modal
-  const adicionalTriggerItems = useMemo(() => {
-    if (!adicionalPromo?.items) return [];
-    // Find the "aplica" items — they reference a category
-    const aplicaItems = adicionalPromo.items.filter((i) => i.rol === "aplica");
+  // Items available for the promo selection modal
+  const selectionTriggerItems = useMemo(() => {
+    if (!selectionPromo?.items) return [];
+    const aplicaItems = selectionPromo.items.filter((i) => i.rol === "aplica");
     const categoryIds = aplicaItems.map((i) => i.category).filter(Boolean) as number[];
     const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
-    return menuItems.filter(
-      (mi) => categoryIds.includes(mi.category) || specificItemIds.includes(mi.id)
-    );
-  }, [adicionalPromo, menuItems]);
+    // Get precio_filtro if present (for NxM promos like "cócteles de $3")
+    const precioFiltro = aplicaItems.find((i) => i.precio_filtro)?.precio_filtro;
+    return menuItems.filter((mi) => {
+      const matchesCategory = categoryIds.includes(mi.category);
+      const matchesItem = specificItemIds.includes(mi.id);
+      if (!matchesCategory && !matchesItem) return false;
+      // Apply price filter if present
+      if (precioFiltro && parseFloat(mi.price) !== parseFloat(precioFiltro)) return false;
+      return true;
+    });
+  }, [selectionPromo, menuItems]);
 
   const removePromoFromCart = (promoId: number, selectedItemId?: number) => {
     setCartPromos((prev) =>
@@ -1025,37 +1036,42 @@ export default function NuevoPedidoPage() {
         </div>
       )}
 
-      {/* ═══ ADICIONAL PROMO SELECTION MODAL ═══ */}
-      {adicionalPromo && (
+      {/* ═══ PROMO SELECTION MODAL ═══ */}
+      {selectionPromo && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {adicionalPromo.nombre}
+                  {selectionPromo.nombre}
                 </h3>
                 <p className="text-sm text-purple-600">
-                  Selecciona el producto base (+${parseFloat(adicionalPromo.precio_extra || "0").toFixed(2)} adicional)
+                  {selectionPromo.tipo === "adicional"
+                    ? `Selecciona el producto base (+$${parseFloat(selectionPromo.precio_extra || "0").toFixed(2)} adicional)`
+                    : `Selecciona el producto (${selectionPromo.cantidad_requerida || 2} unidades por $${parseFloat(selectionPromo.precio_promocional || "0").toFixed(2)})`}
                 </p>
               </div>
               <button
-                onClick={() => setAdicionalPromo(null)}
+                onClick={() => setSelectionPromo(null)}
                 className="p-2 rounded-lg hover:bg-gray-100"
               >
                 <X className="h-5 w-5 text-gray-400" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              {adicionalTriggerItems.length === 0 ? (
+              {selectionTriggerItems.length === 0 ? (
                 <p className="text-center text-gray-400 py-8">No hay productos disponibles para esta promoción</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {adicionalTriggerItems.map((item) => {
-                    const totalPrice = parseFloat(item.price) + parseFloat(adicionalPromo.precio_extra || "0");
+                  {selectionTriggerItems.map((item) => {
+                    const isAdicional = selectionPromo.tipo === "adicional";
+                    const displayPrice = isAdicional
+                      ? parseFloat(item.price) + parseFloat(selectionPromo.precio_extra || "0")
+                      : parseFloat(selectionPromo.precio_promocional || "0");
                     return (
                       <button
                         key={item.id}
-                        onClick={() => addAdicionalPromoWithItem(adicionalPromo, item)}
+                        onClick={() => addPromoWithSelectedItem(selectionPromo, item)}
                         className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-200 bg-white hover:border-purple-400 hover:shadow-md text-left transition-all"
                       >
                         <div className="h-12 w-12 rounded-lg bg-brand-sage flex-shrink-0 overflow-hidden">
@@ -1069,8 +1085,10 @@ export default function NuevoPedidoPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-400">${item.price}</p>
-                          <p className="text-sm font-bold text-purple-600">Total: ${totalPrice.toFixed(2)}</p>
+                          <p className="text-xs text-gray-400">${item.price} c/u</p>
+                          <p className="text-sm font-bold text-purple-600">
+                            {isAdicional ? `Total: $${displayPrice.toFixed(2)}` : `${selectionPromo.cantidad_requerida || 2} × $${displayPrice.toFixed(2)}`}
+                          </p>
                         </div>
                       </button>
                     );
