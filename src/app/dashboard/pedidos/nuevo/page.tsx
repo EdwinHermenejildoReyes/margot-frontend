@@ -39,6 +39,7 @@ interface CartItem {
 interface CartPromo {
   promocion: Promocion;
   cantidad: number;
+  selectedItem?: MenuItem; // For "adicional" promos: the trigger item chosen by user
 }
 
 export default function NuevoPedidoPage() {
@@ -77,6 +78,9 @@ export default function NuevoPedidoPage() {
 
   /* ── Empaque warning ── */
   const [showEmpaqueWarning, setShowEmpaqueWarning] = useState(false);
+
+  /* ── Adicional promo selection modal ── */
+  const [adicionalPromo, setAdicionalPromo] = useState<Promocion | null>(null);
 
   /* ── Empaques states ── */
   const [tiposEmpaque, setTiposEmpaque] = useState<TipoEmpaque[]>([]);
@@ -235,6 +239,11 @@ export default function NuevoPedidoPage() {
 
   /* ── Promo cart helpers ── */
   const addPromoToCart = (promo: Promocion) => {
+    // For "adicional" promos, open selection modal to pick trigger item
+    if (promo.tipo === "adicional") {
+      setAdicionalPromo(promo);
+      return;
+    }
     setCartPromos((prev) => {
       const existing = prev.find((p) => p.promocion.id === promo.id);
       if (existing) {
@@ -246,27 +255,61 @@ export default function NuevoPedidoPage() {
     });
   };
 
-  const removePromoFromCart = (promoId: number) => {
-    setCartPromos((prev) => prev.filter((p) => p.promocion.id !== promoId));
+  const addAdicionalPromoWithItem = (promo: Promocion, item: MenuItem) => {
+    setCartPromos((prev) => {
+      // For adicional promos, each different selected item is a separate cart entry
+      const existing = prev.find(
+        (p) => p.promocion.id === promo.id && p.selectedItem?.id === item.id
+      );
+      if (existing) {
+        return prev.map((p) =>
+          p.promocion.id === promo.id && p.selectedItem?.id === item.id
+            ? { ...p, cantidad: p.cantidad + 1 }
+            : p
+        );
+      }
+      return [...prev, { promocion: promo, cantidad: 1, selectedItem: item }];
+    });
+    setAdicionalPromo(null);
   };
 
-  const updatePromoQuantity = (promoId: number, delta: number) => {
+  // Items available for the adicional selection modal
+  const adicionalTriggerItems = useMemo(() => {
+    if (!adicionalPromo?.items) return [];
+    // Find the "aplica" items — they reference a category
+    const aplicaItems = adicionalPromo.items.filter((i) => i.rol === "aplica");
+    const categoryIds = aplicaItems.map((i) => i.category).filter(Boolean) as number[];
+    const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
+    return menuItems.filter(
+      (mi) => categoryIds.includes(mi.category) || specificItemIds.includes(mi.id)
+    );
+  }, [adicionalPromo, menuItems]);
+
+  const removePromoFromCart = (promoId: number, selectedItemId?: number) => {
+    setCartPromos((prev) =>
+      prev.filter((p) => !(p.promocion.id === promoId && p.selectedItem?.id === selectedItemId))
+    );
+  };
+
+  const updatePromoQuantity = (promoId: number, delta: number, selectedItemId?: number) => {
     setCartPromos((prev) =>
       prev
         .map((p) =>
-          p.promocion.id === promoId ? { ...p, cantidad: Math.max(0, p.cantidad + delta) } : p
+          p.promocion.id === promoId && p.selectedItem?.id === selectedItemId
+            ? { ...p, cantidad: Math.max(0, p.cantidad + delta) }
+            : p
         )
         .filter((p) => p.cantidad > 0)
     );
   };
 
-  const promoPrice = (p: Promocion) =>
+  const promoPrice = (p: Promocion, selectedItem?: MenuItem) =>
     p.tipo === "adicional"
-      ? parseFloat(p.precio_extra || "0")
+      ? parseFloat(selectedItem?.price || "0") + parseFloat(p.precio_extra || "0")
       : parseFloat(p.precio_promocional || "0");
 
   const promosTotal = useMemo(
-    () => cartPromos.reduce((sum, cp) => sum + promoPrice(cp.promocion) * cp.cantidad, 0),
+    () => cartPromos.reduce((sum, cp) => sum + promoPrice(cp.promocion, cp.selectedItem) * cp.cantidad, 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cartPromos]
   );
@@ -339,6 +382,7 @@ export default function NuevoPedidoPage() {
         promociones: cartPromos.map((cp) => ({
           promocion: cp.promocion.id,
           cantidad: cp.cantidad,
+          ...(cp.selectedItem ? { menu_item_seleccionado: cp.selectedItem.id } : {}),
         })),
       };
 
@@ -484,15 +528,20 @@ export default function NuevoPedidoPage() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                     {filteredPromos.map((promo) => {
-                      const inCart = cartPromos.find((cp) => cp.promocion.id === promo.id);
-                      const precio = promoPrice(promo);
+                      const inCartCount = cartPromos
+                        .filter((cp) => cp.promocion.id === promo.id)
+                        .reduce((s, cp) => s + cp.cantidad, 0);
+                      const isAdicional = promo.tipo === "adicional";
+                      const precio = isAdicional
+                        ? parseFloat(promo.precio_extra || "0")
+                        : parseFloat(promo.precio_promocional || "0");
                       return (
                         <button
                           key={`promo-${promo.id}`}
                           onClick={() => addPromoToCart(promo)}
                           className={clsx(
                             "relative flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-md",
-                            inCart
+                            inCartCount > 0
                               ? "border-purple-500 bg-purple-50"
                               : "border-gray-200 bg-white hover:border-purple-300"
                           )}
@@ -503,11 +552,13 @@ export default function NuevoPedidoPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{promo.nombre}</p>
                             <p className="text-xs text-purple-500 truncate">{promo.tipo_display}</p>
-                            <p className="text-sm font-bold text-purple-600 mt-0.5">${precio.toFixed(2)}</p>
+                            <p className="text-sm font-bold text-purple-600 mt-0.5">
+                              {isAdicional ? `+ $${precio.toFixed(2)}` : `$${precio.toFixed(2)}`}
+                            </p>
                           </div>
-                          {inCart && (
+                          {inCartCount > 0 && (
                             <span className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center shadow">
-                              {inCart.cantidad}
+                              {inCartCount}
                             </span>
                           )}
                         </button>
@@ -822,28 +873,34 @@ export default function NuevoPedidoPage() {
                     </div>
                   )}
                   {cartPromos.map((cp) => {
-                    const precio = promoPrice(cp.promocion);
+                    const precio = promoPrice(cp.promocion, cp.selectedItem);
+                    const cartKey = `promo-${cp.promocion.id}-${cp.selectedItem?.id || ""}`;
                     return (
-                      <div key={`promo-${cp.promocion.id}`} className="group">
+                      <div key={cartKey} className="group">
                         <div className="flex items-center gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">
                               {cp.promocion.nombre}
                             </p>
+                            {cp.selectedItem && (
+                              <p className="text-xs text-gray-600 truncate">
+                                → {cp.selectedItem.name}
+                              </p>
+                            )}
                             <p className="text-xs text-purple-500">
                               ${precio.toFixed(2)} c/u · {cp.promocion.tipo_display}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => updatePromoQuantity(cp.promocion.id, -1)}
+                              onClick={() => updatePromoQuantity(cp.promocion.id, -1, cp.selectedItem?.id)}
                               className="h-7 w-7 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
                             >
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="text-sm font-semibold w-6 text-center">{cp.cantidad}</span>
                             <button
-                              onClick={() => updatePromoQuantity(cp.promocion.id, 1)}
+                              onClick={() => updatePromoQuantity(cp.promocion.id, 1, cp.selectedItem?.id)}
                               className="h-7 w-7 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
                             >
                               <Plus className="h-3 w-3" />
@@ -853,7 +910,7 @@ export default function NuevoPedidoPage() {
                             ${(precio * cp.cantidad).toFixed(2)}
                           </p>
                           <button
-                            onClick={() => removePromoFromCart(cp.promocion.id)}
+                            onClick={() => removePromoFromCart(cp.promocion.id, cp.selectedItem?.id)}
                             className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -963,6 +1020,63 @@ export default function NuevoPedidoPage() {
               >
                 Continuar sin empaques
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ADICIONAL PROMO SELECTION MODAL ═══ */}
+      {adicionalPromo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {adicionalPromo.nombre}
+                </h3>
+                <p className="text-sm text-purple-600">
+                  Selecciona el producto base (+${parseFloat(adicionalPromo.precio_extra || "0").toFixed(2)} adicional)
+                </p>
+              </div>
+              <button
+                onClick={() => setAdicionalPromo(null)}
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {adicionalTriggerItems.length === 0 ? (
+                <p className="text-center text-gray-400 py-8">No hay productos disponibles para esta promoción</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {adicionalTriggerItems.map((item) => {
+                    const totalPrice = parseFloat(item.price) + parseFloat(adicionalPromo.precio_extra || "0");
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => addAdicionalPromoWithItem(adicionalPromo, item)}
+                        className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-200 bg-white hover:border-purple-400 hover:shadow-md text-left transition-all"
+                      >
+                        <div className="h-12 w-12 rounded-lg bg-brand-sage flex-shrink-0 overflow-hidden">
+                          {item.image ? (
+                            <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center">
+                              <UtensilsCrossed className="h-5 w-5 text-brand-sage-dark" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400">${item.price}</p>
+                          <p className="text-sm font-bold text-purple-600">Total: ${totalPrice.toFixed(2)}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

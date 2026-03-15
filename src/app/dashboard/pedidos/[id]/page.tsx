@@ -47,6 +47,8 @@ interface PromocionPedido {
   promocion_nombre: string;
   promocion_tipo: string;
   promocion_tipo_display: string;
+  menu_item_seleccionado?: number;
+  menu_item_seleccionado_nombre?: string;
   cantidad: number;
   precio_unitario: string;
   subtotal: string;
@@ -90,6 +92,8 @@ interface EditPromo {
   nombre: string;
   precio: number;
   cantidad: number;
+  menu_item_seleccionado?: number;
+  menu_item_seleccionado_nombre?: string;
 }
 
 /* ── Component ── */
@@ -184,6 +188,8 @@ export default function PedidoDetailPage() {
         nombre: p.promocion_nombre,
         precio: parseFloat(p.precio_unitario),
         cantidad: p.cantidad,
+        menu_item_seleccionado: p.menu_item_seleccionado,
+        menu_item_seleccionado_nombre: p.menu_item_seleccionado_nombre,
       }))
     );
     setEditNotas(pedido.notas || "");
@@ -294,6 +300,7 @@ export default function PedidoDetailPage() {
         promociones: editPromos.map((p) => ({
           promocion: p.promocion_id,
           cantidad: p.cantidad,
+          ...(p.menu_item_seleccionado ? { menu_item_seleccionado: p.menu_item_seleccionado } : {}),
         })),
       });
       setPedido(data);
@@ -522,6 +529,9 @@ export default function PedidoDetailPage() {
                     <div key={`promo-${pp.id}`} className="px-6 py-4 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{pp.promocion_nombre}</p>
+                        {pp.menu_item_seleccionado_nombre && (
+                          <p className="text-xs text-gray-600">→ {pp.menu_item_seleccionado_nombre}</p>
+                        )}
                         <p className="text-xs text-purple-500">
                           {pp.promocion_tipo_display} · Cantidad: {pp.cantidad} × ${pp.precio_unitario}
                         </p>
@@ -624,6 +634,9 @@ export default function PedidoDetailPage() {
                       <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900">{p.nombre}</p>
+                          {p.menu_item_seleccionado_nombre && (
+                            <p className="text-xs text-gray-600">→ {p.menu_item_seleccionado_nombre}</p>
+                          )}
                           <p className="text-xs text-purple-500">${p.precio.toFixed(2)} c/u</p>
                         </div>
                         <div className="flex items-center gap-1.5">

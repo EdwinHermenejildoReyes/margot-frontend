@@ -129,6 +129,8 @@ export interface PedidoPromocion {
   promocion_nombre: string;
   promocion_tipo: string;
   promocion_tipo_display: string;
+  menu_item_seleccionado?: number;
+  menu_item_seleccionado_nombre?: string;
   cantidad: number;
   precio_unitario: string;
   subtotal: string;
