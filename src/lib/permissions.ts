@@ -5,6 +5,7 @@ export const TIPOS_INTERNOS: TipoUsuario[] = [
   "comercio",
   "mesero",
   "cocinero",
+  "barman",
   "cajero",
 ];
 
@@ -13,6 +14,7 @@ export const TIPO_LABELS: Record<TipoUsuario, string> = {
   comercio: "Administrador",
   mesero: "Mesero",
   cocinero: "Cocinero",
+  barman: "Barman",
   cajero: "Cajero",
   cliente: "Cliente",
   repartidor: "Repartidor",
@@ -27,6 +29,7 @@ export const ROLE_ROUTES: Record<TipoUsuario, string[]> = {
     "/dashboard/pedidos",
     "/dashboard/mesas",
     "/dashboard/cocina",
+    "/dashboard/barra",
     "/dashboard/inventario",
     "/dashboard/costeo",
     "/dashboard/estadisticas",
@@ -52,6 +55,12 @@ export const ROLE_ROUTES: Record<TipoUsuario, string[]> = {
   ],
   cocinero: [
     "/dashboard/cocina",
+    "/dashboard/inventario",
+    "/dashboard/limpieza",
+    "/dashboard/asistencia",
+  ],
+  barman: [
+    "/dashboard/barra",
     "/dashboard/inventario",
     "/dashboard/limpieza",
     "/dashboard/asistencia",
@@ -89,7 +98,7 @@ export function canViewAlerts(user: User | null): boolean {
 /** ¿El usuario puede gestionar (CRUD) esta sección? */
 export function canManage(
   user: User | null,
-  section: "menu" | "pedidos" | "mesas" | "cocina" | "inventario" | "estadisticas" | "limpieza" | "asistencia" | "costeo" | "promociones"
+  section: "menu" | "pedidos" | "mesas" | "cocina" | "barra" | "inventario" | "estadisticas" | "limpieza" | "asistencia" | "costeo" | "promociones"
 ): boolean {
   if (!user) return false;
   if (user.is_staff || user.tipo_usuario === "comercio") return true;
@@ -101,10 +110,11 @@ export function canManage(
       return ["mesero", "cajero"].includes(user.tipo_usuario);
     case "cocina":
       return user.tipo_usuario === "cocinero";
+    case "barra":
+      return user.tipo_usuario === "barman";
     case "inventario":
     case "limpieza":
     case "costeo":
-      // mesero, cajero, cocinero can view but NOT create/edit/delete
       return false;
     case "menu":
     case "promociones":

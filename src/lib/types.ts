@@ -1,5 +1,5 @@
 // ── Auth ──
-export type TipoUsuario = "comercio" | "mesero" | "cocinero" | "cajero" | "cliente" | "repartidor";
+export type TipoUsuario = "comercio" | "mesero" | "cocinero" | "barman" | "cajero" | "cliente" | "repartidor";
 
 export interface User {
   id: number;
@@ -89,6 +89,7 @@ export interface PedidoDetalle {
   menu_item: number;
   menu_item_name?: string;
   menu_item_nombre?: string;
+  section_name?: string;
   cantidad: number;
   precio_unitario: string;
   subtotal: string;
@@ -131,6 +132,7 @@ export interface PedidoPromocion {
   promocion_tipo_display: string;
   menu_item_seleccionado?: number;
   menu_item_seleccionado_nombre?: string;
+  menu_item_seleccionado_section?: string;
   cantidad: number;
   precio_unitario: string;
   subtotal: string;

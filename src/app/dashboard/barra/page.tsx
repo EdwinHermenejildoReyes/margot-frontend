@@ -11,7 +11,7 @@ import StockInsuficienteModal, {
   type StockErrorResponse,
 } from "@/components/StockInsuficienteModal";
 import {
-  ChefHat,
+  Wine,
   Clock,
   RefreshCw,
   Armchair,
@@ -22,15 +22,15 @@ import {
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
-interface PedidoCocina extends Pedido {
+interface PedidoBarra extends Pedido {
   detalles?: PedidoDetalle[];
   promociones?: PedidoPromocion[];
 }
 
-export default function CocinaPage() {
+export default function BarraPage() {
   const { user } = useAuth();
-  const canEdit = canManage(user, "cocina");
-  const [pedidos, setPedidos] = useState<PedidoCocina[]>([]);
+  const canEdit = canManage(user, "barra");
+  const [pedidos, setPedidos] = useState<PedidoBarra[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -38,23 +38,21 @@ export default function CocinaPage() {
 
   const fetchPedidos = useCallback(async () => {
     try {
-      const { data } = await api.get("/pedidos/cocina/?seccion=Cocina");
-      const list: PedidoCocina[] = Array.isArray(data) ? data : data.results || [];
-      // Filtrar items para mostrar solo los de Cocina (o sin sección)
+      const { data } = await api.get("/pedidos/cocina/?seccion=Barra");
+      const list: PedidoBarra[] = Array.isArray(data) ? data : data.results || [];
+      // Filtrar items para mostrar solo los de Barra
       const filtered = list.map((p) => ({
         ...p,
-        detalles: p.detalles?.filter(
-          (d) => !d.section_name || d.section_name === "Cocina"
-        ),
+        detalles: p.detalles?.filter((d) => d.section_name === "Barra"),
         promociones: p.promociones?.filter(
-          (pp) => !pp.menu_item_seleccionado_section || pp.menu_item_seleccionado_section === "Cocina"
+          (pp) => pp.menu_item_seleccionado_section === "Barra"
         ),
       })).filter(
         (p) => (p.detalles?.length || 0) + (p.promociones?.length || 0) > 0
       );
       setPedidos(filtered);
     } catch {
-      toast.error("Error al cargar pedidos de cocina");
+      toast.error("Error al cargar pedidos de barra");
     } finally {
       setLoading(false);
     }
@@ -77,7 +75,7 @@ export default function CocinaPage() {
       await api.post(`/pedidos/${id}/${action}/`);
       toast.success(
         action === "preparar"
-          ? "🔥 Preparación iniciada"
+          ? "🍹 Preparación iniciada"
           : "✅ Pedido listo para servir"
       );
       fetchPedidos();
@@ -114,7 +112,7 @@ export default function CocinaPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <ChefHat className="h-7 w-7 text-brand-gold" /> Pantalla de Cocina
+            <Wine className="h-7 w-7 text-purple-500" /> Pantalla de Barra
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {confirmados.length} por preparar · {enPreparacion.length} en preparación
@@ -126,7 +124,7 @@ export default function CocinaPage() {
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded text-brand-gold"
+              className="rounded text-purple-500"
             />
             Auto-actualizar
           </label>
@@ -142,12 +140,12 @@ export default function CocinaPage() {
       {/* Empty State */}
       {pedidos.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border border-gray-200">
-          <ChefHat className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <Wine className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-400">
             Sin pedidos pendientes
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Los nuevos pedidos confirmados aparecerán aquí automáticamente
+            Los pedidos con bebidas aparecerán aquí automáticamente
           </p>
         </div>
       ) : (
@@ -217,7 +215,7 @@ function PedidoCard({
   actionLoading,
   canEdit,
 }: {
-  pedido: PedidoCocina;
+  pedido: PedidoBarra;
   getElapsedTime: (d: string) => string;
   onAction: (id: number, action: string) => void;
   actionLoading: number | null;
@@ -231,7 +229,7 @@ function PedidoCard({
     <div
       className={clsx(
         "rounded-xl border-2 overflow-hidden shadow-sm transition-shadow hover:shadow-md",
-        isConfirmado && "border-blue-300 bg-blue-50/30",
+        isConfirmado && "border-purple-300 bg-purple-50/30",
         isEnPreparacion && "border-orange-300 bg-orange-50/30"
       )}
     >
@@ -261,7 +259,7 @@ function PedidoCard({
       <div className="px-4 py-3 space-y-2 border-t border-gray-100">
         {pedido.detalles?.map((det) => (
           <div key={det.id} className="flex items-start gap-2">
-            <span className="h-6 w-6 rounded-full bg-brand-sage text-brand-bronze text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+            <span className="h-6 w-6 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
               {det.cantidad}
             </span>
             <div>
@@ -302,7 +300,7 @@ function PedidoCard({
           <button
             onClick={() => onAction(pedido.id, "preparar")}
             disabled={isLoading}
-            className="flex-1 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Flame className="h-4 w-4" />
             {isLoading ? "Procesando..." : "Iniciar Preparación"}
