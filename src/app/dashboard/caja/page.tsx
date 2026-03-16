@@ -238,6 +238,9 @@ export default function CajaDiariaPage() {
   const ventasTarjeta = Number(resumen?.ventas_tarjeta || 0);
   const ventasSinRegistro = Number(resumen?.ventas_sin_registro || 0);
 
+  const efectivoEnCaja = apertura + (totalVentas - ventasTransferencia) - totalGastos;
+  const isEfectivoPositive = efectivoEnCaja >= 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -336,7 +339,7 @@ export default function CajaDiariaPage() {
           <p className="text-xs text-gray-400 mt-1">{gastos.length} registro{gastos.length !== 1 ? "s" : ""}</p>
         </div>
 
-        {/* Resultado */}
+        {/* Resultado con transferencias */}
         <div className={clsx(
           "border rounded-xl p-5 shadow-sm",
           isPositive
@@ -347,13 +350,41 @@ export default function CajaDiariaPage() {
             <div className={clsx("p-2 rounded-lg", isPositive ? "bg-emerald-100" : "bg-red-100")}>
               <DollarSign className={clsx("h-5 w-5", isPositive ? "text-emerald-600" : "text-red-600")} />
             </div>
-            <span className="text-sm text-gray-500">Resultado del Día</span>
+            <span className="text-sm text-gray-500">Total (con transferencias)</span>
           </div>
           <p className={clsx("text-2xl font-bold", isPositive ? "text-emerald-600" : "text-red-600")}>
             ${fmt(resultado)}
           </p>
           <p className="text-xs text-gray-400 mt-1">Apertura + Ventas − Gastos</p>
         </div>
+      </div>
+
+      {/* Efectivo en Caja (sin transferencias) */}
+      <div className={clsx(
+        "border rounded-xl p-5 shadow-sm",
+        isEfectivoPositive
+          ? "bg-blue-50 border-blue-200"
+          : "bg-red-50 border-red-200"
+      )}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={clsx("p-2 rounded-lg", isEfectivoPositive ? "bg-blue-100" : "bg-red-100")}>
+              <Banknote className={clsx("h-6 w-6", isEfectivoPositive ? "text-blue-600" : "text-red-600")} />
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">Efectivo en Caja (sin transferencias)</span>
+              <p className="text-xs text-gray-400">Apertura + Ventas en efectivo/tarjeta − Gastos</p>
+            </div>
+          </div>
+          <p className={clsx("text-2xl font-bold", isEfectivoPositive ? "text-blue-700" : "text-red-600")}>
+            ${fmt(efectivoEnCaja)}
+          </p>
+        </div>
+        {ventasTransferencia > 0 && (
+          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+            <ArrowRightLeft className="h-3 w-3" /> ${fmt(ventasTransferencia)} en transferencias no incluidas
+          </p>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════ */}
@@ -724,10 +755,22 @@ export default function CajaDiariaPage() {
             isPositive ? "bg-emerald-50" : "bg-red-50"
           )}>
             <span className={clsx("font-semibold text-lg", isPositive ? "text-emerald-700" : "text-red-700")}>
-              Resultado
+              Resultado Total
             </span>
             <span className={clsx("font-mono font-bold text-lg", isPositive ? "text-emerald-700" : "text-red-700")}>
               ${fmt(resultado)}
+            </span>
+          </div>
+          <div className={clsx(
+            "flex justify-between items-center py-3 rounded-lg px-3 mt-1",
+            isEfectivoPositive ? "bg-blue-50" : "bg-red-50"
+          )}>
+            <span className={clsx("font-semibold flex items-center gap-2", isEfectivoPositive ? "text-blue-700" : "text-red-700")}>
+              <Banknote className="h-4 w-4" /> Efectivo en Caja
+              <span className="text-xs font-normal text-gray-400">(sin transferencias)</span>
+            </span>
+            <span className={clsx("font-mono font-bold text-lg", isEfectivoPositive ? "text-blue-700" : "text-red-700")}>
+              ${fmt(efectivoEnCaja)}
             </span>
           </div>
         </div>
