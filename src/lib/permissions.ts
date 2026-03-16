@@ -34,6 +34,7 @@ export const ROLE_ROUTES: Record<TipoUsuario, string[]> = {
     "/dashboard/costeo",
     "/dashboard/estadisticas",
     "/dashboard/promociones",
+    "/dashboard/caja",
     "/dashboard/limpieza",
     "/dashboard/asistencia",
   ],
@@ -49,6 +50,7 @@ export const ROLE_ROUTES: Record<TipoUsuario, string[]> = {
     "/dashboard",
     "/dashboard/mesas",
     "/dashboard/pedidos",
+    "/dashboard/caja",
     "/dashboard/inventario",
     "/dashboard/limpieza",
     "/dashboard/asistencia",
@@ -98,7 +100,7 @@ export function canViewAlerts(user: User | null): boolean {
 /** ¿El usuario puede gestionar (CRUD) esta sección? */
 export function canManage(
   user: User | null,
-  section: "menu" | "pedidos" | "mesas" | "cocina" | "barra" | "inventario" | "estadisticas" | "limpieza" | "asistencia" | "costeo" | "promociones"
+  section: "menu" | "pedidos" | "mesas" | "cocina" | "barra" | "inventario" | "estadisticas" | "limpieza" | "asistencia" | "costeo" | "promociones" | "caja"
 ): boolean {
   if (!user) return false;
   if (user.is_staff || user.tipo_usuario === "comercio") return true;
@@ -112,6 +114,8 @@ export function canManage(
       return user.tipo_usuario === "cocinero";
     case "barra":
       return user.tipo_usuario === "barman";
+    case "caja":
+      return ["cajero"].includes(user.tipo_usuario);
     case "inventario":
     case "limpieza":
     case "costeo":

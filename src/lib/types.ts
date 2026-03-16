@@ -430,3 +430,43 @@ export interface ResumenEquipo {
   anio: number;
   equipo: ResumenEmpleado[];
 }
+
+// ── Caja Diaria ──
+export interface GastoDiario {
+  id: number;
+  cierre_caja: number;
+  descripcion: string;
+  monto: string;
+  categoria: string;
+  categoria_display?: string;
+  created_at: string;
+}
+
+export interface CierreCaja {
+  id: number;
+  fecha: string;
+  monto_apertura: string;
+  total_ventas: string;
+  total_gastos: string;
+  resultado: string;
+  observaciones: string;
+  cerrado: boolean;
+  cerrado_at?: string | null;
+  cerrado_por_nombre?: string | null;
+  gastos?: GastoDiario[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ResumenDia {
+  fecha: string;
+  cierre_caja: CierreCaja | null;
+  pedidos: Pedido[];
+  resumen: {
+    total_pedidos: number;
+    total_ventas: string;
+    monto_apertura: string;
+    total_gastos: string;
+    resultado: string;
+  };
+}

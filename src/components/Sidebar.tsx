@@ -21,6 +21,7 @@ import {
   X,
   Clock,
   Sparkles,
+  Landmark,
 } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
@@ -37,6 +38,7 @@ const navigation = [
   { key: "costeo", name: "Costeo", href: "/dashboard/costeo", icon: Calculator },
   { key: "estadisticas", name: "Estadísticas", href: "/dashboard/estadisticas", icon: BarChart3 },
   { key: "promociones", name: "Promociones", href: "/dashboard/promociones", icon: Sparkles },
+  { key: "caja", name: "Caja Diaria", href: "/dashboard/caja", icon: Landmark },
   { key: "limpieza", name: "Limpieza", href: "/dashboard/limpieza", icon: SprayCanIcon },
   { key: "asistencia", name: "Asistencia", href: "/dashboard/asistencia", icon: Clock },
 ];
