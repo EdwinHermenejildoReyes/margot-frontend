@@ -7,7 +7,7 @@ import { canManage } from "@/lib/permissions";
 import type { Mesa, Atencion, Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil, DoorOpen } from "lucide-react";
+import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil, DoorOpen, Banknote, ArrowRightLeft, CreditCard } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -29,6 +29,7 @@ export default function MesasPage() {
   const [showAtencionModal, setShowAtencionModal] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [liberando, setLiberando] = useState<number | null>(null);
+  const [liberarModal, setLiberarModal] = useState<number | null>(null);
 
   const fetchMesas = async () => {
     try {
@@ -99,11 +100,16 @@ export default function MesasPage() {
     setShowAtencionModal(true);
   };
 
-  const handleLiberar = async (atencionId: number) => {
-    if (!confirm("¿Liberar esta mesa? La atención se cerrará y la mesa quedará disponible.")) return;
-    setLiberando(atencionId);
+  const handleLiberar = (atencionId: number) => {
+    setLiberarModal(atencionId);
+  };
+
+  const handleConfirmLiberar = async (metodoPago: string) => {
+    if (!liberarModal) return;
+    setLiberando(liberarModal);
+    setLiberarModal(null);
     try {
-      await api.post(`/atenciones/${atencionId}/liberar/`);
+      await api.post(`/atenciones/${liberarModal}/liberar/`, { metodo_pago: metodoPago });
       toast.success("Mesa liberada");
       await fetchMesas();
       const ats = await fetchAtenciones();
@@ -257,6 +263,45 @@ export default function MesasPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Liberar Mesa - Payment Method Modal */}
+      {liberarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Método de Pago</h2>
+              <button onClick={() => setLiberarModal(null)} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-gray-500 mb-4">Selecciona cómo pagó el cliente para liberar la mesa.</p>
+              <button
+                onClick={() => handleConfirmLiberar("efectivo")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-green-200 bg-green-50 text-green-800 font-medium hover:border-green-400 transition-colors"
+              >
+                <Banknote className="h-5 w-5" /> Efectivo
+              </button>
+              <button
+                onClick={() => handleConfirmLiberar("transferencia")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-blue-200 bg-blue-50 text-blue-800 font-medium hover:border-blue-400 transition-colors"
+              >
+                <ArrowRightLeft className="h-5 w-5" /> Transferencia
+              </button>
+              <button
+                onClick={() => handleConfirmLiberar("tarjeta")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-purple-200 bg-purple-50 text-purple-800 font-medium hover:border-purple-400 transition-colors"
+              >
+                <CreditCard className="h-5 w-5" /> Tarjeta
+              </button>
+              <button
+                onClick={() => setLiberarModal(null)}
+                className="w-full py-2.5 px-4 rounded-lg border text-sm font-medium text-gray-600 hover:bg-gray-50 mt-2"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

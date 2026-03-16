@@ -82,6 +82,7 @@ export interface Pedido {
   detalles?: PedidoDetalle[];
   promociones?: PedidoPromocion[];
   empaques?: PedidoEmpaque[];
+  metodo_pago?: { metodo: string; display: string } | null;
 }
 
 export interface PedidoDetalle {
@@ -465,6 +466,10 @@ export interface ResumenDia {
   resumen: {
     total_pedidos: number;
     total_ventas: string;
+    ventas_efectivo: string;
+    ventas_transferencia: string;
+    ventas_tarjeta: string;
+    ventas_sin_registro: string;
     monto_apertura: string;
     total_gastos: string;
     resultado: string;

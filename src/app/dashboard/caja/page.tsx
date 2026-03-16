@@ -21,6 +21,9 @@ import {
   Lock,
   LockOpen,
   CheckCircle2,
+  Banknote,
+  ArrowRightLeft,
+  CreditCard,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -230,6 +233,11 @@ export default function CajaDiariaPage() {
   const resultado = Number(resumen?.resultado || 0);
   const isPositive = resultado >= 0;
 
+  const ventasEfectivo = Number(resumen?.ventas_efectivo || 0);
+  const ventasTransferencia = Number(resumen?.ventas_transferencia || 0);
+  const ventasTarjeta = Number(resumen?.ventas_tarjeta || 0);
+  const ventasSinRegistro = Number(resumen?.ventas_sin_registro || 0);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -286,6 +294,34 @@ export default function CajaDiariaPage() {
           </div>
           <p className="text-2xl font-bold text-green-600">${fmt(totalVentas)}</p>
           <p className="text-xs text-gray-400 mt-1">{resumen?.total_pedidos || 0} pedidos</p>
+          {totalVentas > 0 && (
+            <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+              {ventasEfectivo > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1 text-gray-500"><Banknote className="h-3 w-3" /> Efectivo</span>
+                  <span className="text-gray-700 font-medium">${fmt(ventasEfectivo)}</span>
+                </div>
+              )}
+              {ventasTransferencia > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1 text-gray-500"><ArrowRightLeft className="h-3 w-3" /> Transferencia</span>
+                  <span className="text-gray-700 font-medium">${fmt(ventasTransferencia)}</span>
+                </div>
+              )}
+              {ventasTarjeta > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1 text-gray-500"><CreditCard className="h-3 w-3" /> Tarjeta</span>
+                  <span className="text-gray-700 font-medium">${fmt(ventasTarjeta)}</span>
+                </div>
+              )}
+              {ventasSinRegistro > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400">Sin registro</span>
+                  <span className="text-gray-500 font-medium">${fmt(ventasSinRegistro)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Gastos */}
@@ -558,6 +594,7 @@ export default function CajaDiariaPage() {
                       <th className="text-left py-2 pr-4 font-medium">Hora</th>
                       <th className="text-left py-2 pr-4 font-medium">Estado</th>
                       <th className="text-left py-2 pr-4 font-medium">Tipo</th>
+                      <th className="text-left py-2 pr-4 font-medium">Pago</th>
                       <th className="text-right py-2 font-medium">Total</th>
                     </tr>
                   </thead>
@@ -584,6 +621,23 @@ export default function CajaDiariaPage() {
                         <td className="py-3 pr-4 text-gray-500 capitalize">
                           {p.tipo_entrega.replace("_", " ")}
                         </td>
+                        <td className="py-3 pr-4">
+                          {p.metodo_pago ? (
+                            <span className={clsx(
+                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                              p.metodo_pago.metodo === "efectivo" && "bg-green-100 text-green-700",
+                              p.metodo_pago.metodo === "transferencia" && "bg-blue-100 text-blue-700",
+                              p.metodo_pago.metodo === "tarjeta" && "bg-purple-100 text-purple-700",
+                            )}>
+                              {p.metodo_pago.metodo === "efectivo" && <Banknote className="h-3 w-3" />}
+                              {p.metodo_pago.metodo === "transferencia" && <ArrowRightLeft className="h-3 w-3" />}
+                              {p.metodo_pago.metodo === "tarjeta" && <CreditCard className="h-3 w-3" />}
+                              {p.metodo_pago.display}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
                         <td className="py-3 text-right font-semibold text-gray-900">
                           ${fmt(p.total)}
                         </td>
@@ -592,7 +646,7 @@ export default function CajaDiariaPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-200">
-                      <td colSpan={4} className="py-3 text-right text-gray-500 font-medium">
+                      <td colSpan={5} className="py-3 text-right text-gray-500 font-medium">
                         Total Ventas
                       </td>
                       <td className="py-3 text-right font-bold text-green-600 text-base">
@@ -623,11 +677,41 @@ export default function CajaDiariaPage() {
             <span className="text-gray-600">Apertura de Caja</span>
             <span className="font-mono text-gray-900">${fmt(apertura)}</span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <span className="text-green-600 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> Ingresos (Ventas)
-            </span>
-            <span className="font-mono text-green-600">+ ${fmt(totalVentas)}</span>
+          <div className="py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center">
+              <span className="text-green-600 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" /> Ingresos (Ventas)
+              </span>
+              <span className="font-mono text-green-600">+ ${fmt(totalVentas)}</span>
+            </div>
+            {totalVentas > 0 && (
+              <div className="ml-6 mt-1 space-y-0.5">
+                {ventasEfectivo > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-500"><Banknote className="h-3 w-3" /> Efectivo</span>
+                    <span className="font-mono text-gray-600">${fmt(ventasEfectivo)}</span>
+                  </div>
+                )}
+                {ventasTransferencia > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-500"><ArrowRightLeft className="h-3 w-3" /> Transferencia</span>
+                    <span className="font-mono text-gray-600">${fmt(ventasTransferencia)}</span>
+                  </div>
+                )}
+                {ventasTarjeta > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-500"><CreditCard className="h-3 w-3" /> Tarjeta</span>
+                    <span className="font-mono text-gray-600">${fmt(ventasTarjeta)}</span>
+                  </div>
+                )}
+                {ventasSinRegistro > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-400">Sin registro de pago</span>
+                    <span className="font-mono text-gray-400">${fmt(ventasSinRegistro)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex justify-between items-center py-2 border-b border-gray-100">
             <span className="text-red-600 flex items-center gap-2">
