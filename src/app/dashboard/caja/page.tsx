@@ -65,7 +65,8 @@ function fmt(n: string | number): string {
 }
 
 function today(): string {
-  return new Date().toISOString().split("T")[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function CajaDiariaPage() {
@@ -241,6 +242,8 @@ export default function CajaDiariaPage() {
   const efectivoEnCaja = apertura + (totalVentas - ventasTransferencia) - totalGastos;
   const isEfectivoPositive = efectivoEnCaja >= 0;
 
+  const esHoy = fecha === today();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -262,6 +265,14 @@ export default function CajaDiariaPage() {
               <Lock className="h-3.5 w-3.5" /> Caja Cerrada
             </span>
           )}
+          {!esHoy && (
+            <button
+              onClick={() => setFecha(today())}
+              className="text-xs bg-brand-gold/10 text-brand-gold px-2.5 py-1 rounded-full font-medium hover:bg-brand-gold/20 transition-colors"
+            >
+              Ir a Hoy
+            </button>
+          )}
           <Calendar className="h-5 w-5 text-gray-400" />
           <input
             type="date"
@@ -271,6 +282,21 @@ export default function CajaDiariaPage() {
           />
         </div>
       </div>
+
+      {/* Banner: Caja no abierta */}
+      {!cierre && esHoy && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-4">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <Wallet className="h-6 w-6 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-amber-800">Caja no abierta</h3>
+            <p className="text-sm text-amber-700 mt-0.5">
+              Ingresa el monto de apertura para comenzar el día. Luego podrás registrar gastos y al final hacer el cierre de caja.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════ */}
       {/* RESUMEN CARDS                                 */}
