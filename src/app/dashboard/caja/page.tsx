@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import type { ResumenDia, GastoDiario, InversionSocio } from "@/lib/types";
 import {
@@ -25,6 +26,7 @@ import {
   ArrowRightLeft,
   CreditCard,
   Users,
+  Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -92,6 +94,8 @@ function today(): string {
 }
 
 export default function CajaDiariaPage() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.is_staff === true;
   const [fecha, setFecha] = useState(today());
   const [data, setData] = useState<ResumenDia | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +104,11 @@ export default function CajaDiariaPage() {
   const [montoApertura, setMontoApertura] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [savingCaja, setSavingCaja] = useState(false);
+
+  /* Ajuste transferencia (solo superadmin) */
+  const [editingTransferencia, setEditingTransferencia] = useState(false);
+  const [ajusteTransferencia, setAjusteTransferencia] = useState("");
+  const [savingAjuste, setSavingAjuste] = useState(false);
 
   /* Gastos */
   const [gastosOpen, setGastosOpen] = useState(false);
@@ -134,10 +143,13 @@ export default function CajaDiariaPage() {
       if (res.data.cierre_caja) {
         setMontoApertura(res.data.cierre_caja.monto_apertura);
         setObservaciones(res.data.cierre_caja.observaciones || "");
+        setAjusteTransferencia(res.data.cierre_caja.ajuste_transferencia ?? "");
       } else {
         setMontoApertura("");
         setObservaciones("");
+        setAjusteTransferencia("");
       }
+      setEditingTransferencia(false);
     } catch {
       toast.error("Error al cargar datos del día");
     } finally {
@@ -151,7 +163,7 @@ export default function CajaDiariaPage() {
 
   /* ── Guardar / Crear cierre de caja ── */
   const handleSaveCaja = async () => {
-    if (!montoApertura || isNaN(Number(montoApertura))) {
+    if (montoApertura === "" || isNaN(Number(montoApertura)) || Number(montoApertura) < 0) {
       toast.error("Ingrese un monto de apertura válido");
       return;
     }
@@ -176,6 +188,25 @@ export default function CajaDiariaPage() {
       toast.error("Error al guardar la caja");
     } finally {
       setSavingCaja(false);
+    }
+  };
+
+  /* ── Guardar ajuste de transferencia (superadmin) ── */
+  const handleSaveAjusteTransferencia = async () => {
+    if (!data?.cierre_caja) return;
+    setSavingAjuste(true);
+    try {
+      const value = ajusteTransferencia === "" ? null : ajusteTransferencia;
+      await api.patch(`/cierres-caja/${data.cierre_caja.id}/ajuste_transferencia/`, {
+        ajuste_transferencia: value,
+      });
+      toast.success(value === null ? "Ajuste eliminado" : "Transferencia ajustada");
+      setEditingTransferencia(false);
+      fetchData();
+    } catch {
+      toast.error("Error al guardar el ajuste");
+    } finally {
+      setSavingAjuste(false);
     }
   };
 
@@ -319,6 +350,8 @@ export default function CajaDiariaPage() {
 
   const ventasEfectivo = Number(resumen?.ventas_efectivo || 0);
   const ventasTransferencia = Number(resumen?.ventas_transferencia || 0);
+  const ventasTransferenciaCalculado = Number(resumen?.ventas_transferencia_calculado || 0);
+  const tieneAjusteTransferencia = cierre?.ajuste_transferencia != null;
   const ventasTarjeta = Number(resumen?.ventas_tarjeta || 0);
   const ventasSinRegistro = Number(resumen?.ventas_sin_registro || 0);
 
@@ -422,7 +455,10 @@ export default function CajaDiariaPage() {
               )}
               {ventasTransferencia > 0 && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1 text-gray-500"><ArrowRightLeft className="h-3 w-3" /> Transferencia</span>
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <ArrowRightLeft className="h-3 w-3" /> Transferencia
+                    {tieneAjusteTransferencia && <span className="text-indigo-500" title="Ajustado manualmente">*</span>}
+                  </span>
                   <span className="text-gray-700 font-medium">${fmt(ventasTransferencia)}</span>
                 </div>
               )}
@@ -504,11 +540,66 @@ export default function CajaDiariaPage() {
               <ArrowRightLeft className={clsx("h-5 w-5", isSaldoTransPositive ? "text-indigo-600" : "text-red-600")} />
             </div>
             <span className="text-sm text-gray-500">Saldo Transferencias</span>
+            {isSuperAdmin && cierre && !editingTransferencia && (
+              <button
+                onClick={() => {
+                  setAjusteTransferencia(tieneAjusteTransferencia ? String(cierre.ajuste_transferencia) : "");
+                  setEditingTransferencia(true);
+                }}
+                className="ml-auto p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                title="Ajustar valor de transferencia"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          <p className={clsx("text-2xl font-bold", isSaldoTransPositive ? "text-indigo-700" : "text-red-600")}>
-            ${fmt(saldoTransferencias)}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">Ingresos transf. − Gastos transf.</p>
+
+          {editingTransferencia ? (
+            <div className="space-y-2">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Ingreso transferencia (ajuste manual)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={ajusteTransferencia}
+                  onChange={(e) => setAjusteTransferencia(e.target.value)}
+                  placeholder={fmt(ventasTransferenciaCalculado)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Calculado del sistema: ${fmt(ventasTransferenciaCalculado)} — Dejar vacío para usar el calculado
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveAjusteTransferencia}
+                  disabled={savingAjuste}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  <Save className="h-3 w-3" />
+                  {savingAjuste ? "Guardando..." : "Guardar"}
+                </button>
+                <button
+                  onClick={() => setEditingTransferencia(false)}
+                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className={clsx("text-2xl font-bold", isSaldoTransPositive ? "text-indigo-700" : "text-red-600")}>
+                ${fmt(saldoTransferencias)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {tieneAjusteTransferencia
+                  ? `Ajustado manualmente (calculado: $${fmt(ventasTransferenciaCalculado)})`
+                  : "Ingresos transf. − Gastos transf."}
+              </p>
+            </>
+          )}
         </div>
       </div>
 

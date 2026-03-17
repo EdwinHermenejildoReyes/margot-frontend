@@ -324,7 +324,7 @@ export default function MesasPage() {
 }
 
 function NuevaAtencionModal({ mesa, onClose, onCreated }: { mesa: Mesa; onClose: () => void; onCreated: () => void }) {
-  const [comensales, setComensales] = useState(2);
+  const [comensales, setComensales] = useState("2");
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -332,7 +332,7 @@ function NuevaAtencionModal({ mesa, onClose, onCreated }: { mesa: Mesa; onClose:
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post("/atenciones/", { mesa: mesa.id, cantidad_personas: comensales, notas });
+      await api.post("/atenciones/", { mesa: mesa.id, cantidad_personas: Number(comensales) || 1, notas });
       toast.success("Atención creada");
       onCreated();
     } catch {
@@ -352,7 +352,18 @@ function NuevaAtencionModal({ mesa, onClose, onCreated }: { mesa: Mesa; onClose:
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Número de comensales</label>
-            <input type="number" min={1} max={mesa.capacidad} value={comensales} onChange={(e) => setComensales(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none" />
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[1-8]"
+              value={comensales}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, "");
+                if (val === "" || (Number(val) >= 0 && Number(val) <= 8)) setComensales(val);
+              }}
+              className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>

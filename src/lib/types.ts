@@ -461,6 +461,7 @@ export interface CierreCaja {
   id: number;
   fecha: string;
   monto_apertura: string;
+  ajuste_transferencia?: string | null;
   total_ventas: string;
   total_gastos: string;
   resultado: string;
@@ -483,6 +484,7 @@ export interface ResumenDia {
     total_ventas: string;
     ventas_efectivo: string;
     ventas_transferencia: string;
+    ventas_transferencia_calculado?: string;
     ventas_tarjeta: string;
     ventas_sin_registro: string;
     monto_apertura: string;
