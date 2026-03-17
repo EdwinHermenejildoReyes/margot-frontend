@@ -440,6 +440,20 @@ export interface GastoDiario {
   monto: string;
   categoria: string;
   categoria_display?: string;
+  medio_pago: string;
+  medio_pago_display?: string;
+  created_at: string;
+}
+
+export interface InversionSocio {
+  id: number;
+  cierre_caja: number;
+  socio: string;
+  socio_display?: string;
+  monto: string;
+  descripcion: string;
+  categoria: string;
+  categoria_display?: string;
   created_at: string;
 }
 
@@ -455,6 +469,7 @@ export interface CierreCaja {
   cerrado_at?: string | null;
   cerrado_por_nombre?: string | null;
   gastos?: GastoDiario[];
+  inversiones?: InversionSocio[];
   created_at?: string;
   updated_at?: string;
 }
@@ -472,6 +487,9 @@ export interface ResumenDia {
     ventas_sin_registro: string;
     monto_apertura: string;
     total_gastos: string;
+    gastos_efectivo: string;
+    gastos_transferencia: string;
+    total_inversiones: string;
     resultado: string;
   };
 }

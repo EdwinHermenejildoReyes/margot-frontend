@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import type { ResumenDia, GastoDiario } from "@/lib/types";
+import type { ResumenDia, GastoDiario, InversionSocio } from "@/lib/types";
 import {
   Landmark,
   DollarSign,
@@ -24,6 +24,7 @@ import {
   Banknote,
   ArrowRightLeft,
   CreditCard,
+  Users,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -36,6 +37,27 @@ const CATEGORIAS_GASTO = [
   { value: "mantenimiento", label: "Mantenimiento / Reparaciones" },
   { value: "limpieza", label: "Productos de Limpieza" },
   { value: "transporte", label: "Transporte / Delivery" },
+  { value: "marketing", label: "Marketing / Publicidad" },
+  { value: "otros", label: "Otros" },
+];
+
+const MEDIOS_PAGO_GASTO = [
+  { value: "efectivo", label: "Efectivo" },
+  { value: "transferencia", label: "Transferencia" },
+];
+
+const SOCIOS = [
+  { value: "edwin_hermenejildo", label: "Edwin Hermenejildo" },
+  { value: "nadia_banchon", label: "Nadia Banchon" },
+  { value: "enrique_hermenejildo", label: "Enrique Hermenejildo" },
+];
+
+const CATEGORIAS_INVERSION = [
+  { value: "equipamiento", label: "Equipamiento / Mobiliario" },
+  { value: "infraestructura", label: "Infraestructura / Remodelación" },
+  { value: "insumos", label: "Insumos / Materia Prima" },
+  { value: "tecnologia", label: "Tecnología / Software" },
+  { value: "capital", label: "Capital de Trabajo" },
   { value: "marketing", label: "Marketing / Publicidad" },
   { value: "otros", label: "Otros" },
 ];
@@ -85,7 +107,17 @@ export default function CajaDiariaPage() {
   const [gastoDesc, setGastoDesc] = useState("");
   const [gastoMonto, setGastoMonto] = useState("");
   const [gastoCategoria, setGastoCategoria] = useState("otros");
+  const [gastoMedioPago, setGastoMedioPago] = useState("efectivo");
   const [savingGasto, setSavingGasto] = useState(false);
+
+  /* Inversiones */
+  const [inversionesOpen, setInversionesOpen] = useState(false);
+  const [showInversionForm, setShowInversionForm] = useState(false);
+  const [inversionSocio, setInversionSocio] = useState("");
+  const [inversionMonto, setInversionMonto] = useState("");
+  const [inversionDesc, setInversionDesc] = useState("");
+  const [inversionCategoria, setInversionCategoria] = useState("otros");
+  const [savingInversion, setSavingInversion] = useState(false);
 
   /* Pedidos expand */
   const [pedidosOpen, setPedidosOpen] = useState(true);
@@ -164,11 +196,13 @@ export default function CajaDiariaPage() {
         descripcion: gastoDesc.trim(),
         monto: gastoMonto,
         categoria: gastoCategoria,
+        medio_pago: gastoMedioPago,
       });
       toast.success("Gasto registrado");
       setGastoDesc("");
       setGastoMonto("");
       setGastoCategoria("otros");
+      setGastoMedioPago("efectivo");
       setShowGastoForm(false);
       fetchData();
     } catch {
@@ -186,6 +220,54 @@ export default function CajaDiariaPage() {
       fetchData();
     } catch {
       toast.error("Error al eliminar gasto");
+    }
+  };
+
+  /* ── Agregar inversión ── */
+  const handleAddInversion = async () => {
+    if (!data?.cierre_caja) {
+      toast.error("Primero debe crear la caja del día (guardar apertura)");
+      return;
+    }
+    if (!inversionSocio) {
+      toast.error("Seleccione un socio");
+      return;
+    }
+    if (!inversionDesc.trim() || !inversionMonto || isNaN(Number(inversionMonto)) || Number(inversionMonto) <= 0) {
+      toast.error("Complete descripción y monto válido");
+      return;
+    }
+    setSavingInversion(true);
+    try {
+      await api.post("/inversiones-socio/", {
+        cierre_caja: data.cierre_caja.id,
+        socio: inversionSocio,
+        monto: inversionMonto,
+        descripcion: inversionDesc.trim(),
+        categoria: inversionCategoria,
+      });
+      toast.success("Inversión registrada");
+      setInversionSocio("");
+      setInversionMonto("");
+      setInversionDesc("");
+      setInversionCategoria("otros");
+      setShowInversionForm(false);
+      fetchData();
+    } catch {
+      toast.error("Error al registrar inversión");
+    } finally {
+      setSavingInversion(false);
+    }
+  };
+
+  /* ── Eliminar inversión ── */
+  const handleDeleteInversion = async (inversionId: number) => {
+    try {
+      await api.delete(`/inversiones-socio/${inversionId}/`);
+      toast.success("Inversión eliminada");
+      fetchData();
+    } catch {
+      toast.error("Error al eliminar inversión");
     }
   };
 
@@ -226,6 +308,7 @@ export default function CajaDiariaPage() {
   const cierre = data?.cierre_caja;
   const pedidos = data?.pedidos || [];
   const gastos: GastoDiario[] = cierre?.gastos || [];
+  const inversiones: InversionSocio[] = cierre?.inversiones || [];
   const cajaCerrada = cierre?.cerrado === true;
 
   const totalVentas = Number(resumen?.total_ventas || 0);
@@ -239,8 +322,14 @@ export default function CajaDiariaPage() {
   const ventasTarjeta = Number(resumen?.ventas_tarjeta || 0);
   const ventasSinRegistro = Number(resumen?.ventas_sin_registro || 0);
 
-  const efectivoEnCaja = apertura + (totalVentas - ventasTransferencia) - totalGastos;
+  const gastosEfectivo = Number(resumen?.gastos_efectivo || 0);
+  const gastosTransferencia = Number(resumen?.gastos_transferencia || 0);
+  const totalInversiones = Number(resumen?.total_inversiones || 0);
+
+  const efectivoEnCaja = apertura + ventasEfectivo + ventasTarjeta + ventasSinRegistro - gastosEfectivo;
   const isEfectivoPositive = efectivoEnCaja >= 0;
+  const saldoTransferencias = ventasTransferencia - gastosTransferencia;
+  const isSaldoTransPositive = saldoTransferencias >= 0;
 
   const esHoy = fecha === today();
 
@@ -385,32 +474,42 @@ export default function CajaDiariaPage() {
         </div>
       </div>
 
-      {/* Efectivo en Caja (sin transferencias) */}
-      <div className={clsx(
-        "border rounded-xl p-5 shadow-sm",
-        isEfectivoPositive
-          ? "bg-blue-50 border-blue-200"
-          : "bg-red-50 border-red-200"
-      )}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      {/* Efectivo en Caja + Saldo Transferencias */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className={clsx(
+          "border rounded-xl p-5 shadow-sm",
+          isEfectivoPositive
+            ? "bg-blue-50 border-blue-200"
+            : "bg-red-50 border-red-200"
+        )}>
+          <div className="flex items-center gap-3 mb-2">
             <div className={clsx("p-2 rounded-lg", isEfectivoPositive ? "bg-blue-100" : "bg-red-100")}>
-              <Banknote className={clsx("h-6 w-6", isEfectivoPositive ? "text-blue-600" : "text-red-600")} />
+              <Banknote className={clsx("h-5 w-5", isEfectivoPositive ? "text-blue-600" : "text-red-600")} />
             </div>
-            <div>
-              <span className="text-sm text-gray-500">Efectivo en Caja (sin transferencias)</span>
-              <p className="text-xs text-gray-400">Apertura + Ventas en efectivo/tarjeta − Gastos</p>
-            </div>
+            <span className="text-sm text-gray-500">Efectivo en Caja</span>
           </div>
           <p className={clsx("text-2xl font-bold", isEfectivoPositive ? "text-blue-700" : "text-red-600")}>
             ${fmt(efectivoEnCaja)}
           </p>
+          <p className="text-xs text-gray-400 mt-1">Apertura + Ventas no-transf. − Gastos en efectivo</p>
         </div>
-        {ventasTransferencia > 0 && (
-          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-            <ArrowRightLeft className="h-3 w-3" /> ${fmt(ventasTransferencia)} en transferencias no incluidas
+        <div className={clsx(
+          "border rounded-xl p-5 shadow-sm",
+          isSaldoTransPositive
+            ? "bg-indigo-50 border-indigo-200"
+            : "bg-red-50 border-red-200"
+        )}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className={clsx("p-2 rounded-lg", isSaldoTransPositive ? "bg-indigo-100" : "bg-red-100")}>
+              <ArrowRightLeft className={clsx("h-5 w-5", isSaldoTransPositive ? "text-indigo-600" : "text-red-600")} />
+            </div>
+            <span className="text-sm text-gray-500">Saldo Transferencias</span>
+          </div>
+          <p className={clsx("text-2xl font-bold", isSaldoTransPositive ? "text-indigo-700" : "text-red-600")}>
+            ${fmt(saldoTransferencias)}
           </p>
-        )}
+          <p className="text-xs text-gray-400 mt-1">Ingresos transf. − Gastos transf.</p>
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════ */}
@@ -518,6 +617,15 @@ export default function CajaDiariaPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
+                      <span className={clsx(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                        g.medio_pago === "efectivo" && "bg-green-100 text-green-700",
+                        g.medio_pago === "transferencia" && "bg-blue-100 text-blue-700",
+                      )}>
+                        {g.medio_pago === "efectivo" && <Banknote className="h-3 w-3" />}
+                        {g.medio_pago === "transferencia" && <ArrowRightLeft className="h-3 w-3" />}
+                        {g.medio_pago_display}
+                      </span>
                       <span className="text-sm font-semibold text-red-600">${fmt(g.monto)}</span>
                       <button
                         onClick={() => handleDeleteGasto(g.id)}
@@ -591,6 +699,18 @@ export default function CajaDiariaPage() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Medio de Pago</label>
+                  <select
+                    value={gastoMedioPago}
+                    onChange={(e) => setGastoMedioPago(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                  >
+                    {MEDIOS_PAGO_GASTO.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleAddGasto}
@@ -606,6 +726,7 @@ export default function CajaDiariaPage() {
                       setGastoDesc("");
                       setGastoMonto("");
                       setGastoCategoria("otros");
+                      setGastoMedioPago("efectivo");
                     }}
                     className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
                   >
@@ -613,6 +734,164 @@ export default function CajaDiariaPage() {
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* INVERSIONES DE SOCIOS                         */}
+      {/* ══════════════════════════════════════════════ */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <button
+          onClick={() => setInversionesOpen(!inversionesOpen)}
+          className="w-full flex items-center justify-between p-6"
+        >
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-purple-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Inversiones de Socios</h2>
+            <span className="text-sm bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+              ${fmt(totalInversiones)}
+            </span>
+          </div>
+          {inversionesOpen ? (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+
+        {inversionesOpen && (
+          <div className="px-6 pb-6 space-y-4">
+            {inversiones.length > 0 ? (
+              <div className="space-y-2">
+                {inversiones.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{inv.descripcion}</p>
+                      <p className="text-xs text-gray-500">
+                        {inv.categoria_display || inv.categoria}
+                        {inv.created_at && (
+                          <> &middot; {new Date(inv.created_at).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })}</>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                        <Users className="h-3 w-3" />
+                        {inv.socio_display}
+                      </span>
+                      <span className="text-sm font-semibold text-purple-600">${fmt(inv.monto)}</span>
+                      <button
+                        onClick={() => handleDeleteInversion(inv.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar inversión"
+                        disabled={cajaCerrada}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No hay inversiones registradas este día.</p>
+            )}
+
+            {!cajaCerrada && !showInversionForm ? (
+              <button
+                onClick={() => {
+                  if (!cierre) {
+                    toast.error("Primero cree la caja del día (guardar apertura)");
+                    return;
+                  }
+                  setShowInversionForm(true);
+                }}
+                className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 font-medium transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Agregar Inversión
+              </button>
+            ) : (
+              !cajaCerrada && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Nueva Inversión</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Socio</label>
+                      <select
+                        value={inversionSocio}
+                        onChange={(e) => setInversionSocio(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      >
+                        <option value="">Seleccionar socio...</option>
+                        {SOCIOS.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Monto ($)</label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={inversionMonto}
+                        onChange={(e) => setInversionMonto(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Categoría</label>
+                      <select
+                        value={inversionCategoria}
+                        onChange={(e) => setInversionCategoria(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      >
+                        {CATEGORIAS_INVERSION.map((c) => (
+                          <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Descripción</label>
+                    <input
+                      type="text"
+                      value={inversionDesc}
+                      onChange={(e) => setInversionDesc(e.target.value)}
+                      placeholder="Compra de equipos, capital..."
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddInversion}
+                      disabled={savingInversion}
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      <Save className="h-4 w-4" />
+                      {savingInversion ? "Guardando..." : "Guardar Inversión"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowInversionForm(false);
+                        setInversionSocio("");
+                        setInversionMonto("");
+                        setInversionDesc("");
+                        setInversionCategoria("otros");
+                      }}
+                      className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )
             )}
           </div>
         )}
@@ -770,11 +1049,29 @@ export default function CajaDiariaPage() {
               </div>
             )}
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <span className="text-red-600 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4" /> Gastos
-            </span>
-            <span className="font-mono text-red-600">- ${fmt(totalGastos)}</span>
+          <div className="py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center">
+              <span className="text-red-600 flex items-center gap-2">
+                <TrendingDown className="h-4 w-4" /> Gastos
+              </span>
+              <span className="font-mono text-red-600">- ${fmt(totalGastos)}</span>
+            </div>
+            {totalGastos > 0 && (
+              <div className="ml-6 mt-1 space-y-0.5">
+                {gastosEfectivo > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-500"><Banknote className="h-3 w-3" /> Efectivo</span>
+                    <span className="font-mono text-gray-600">${fmt(gastosEfectivo)}</span>
+                  </div>
+                )}
+                {gastosTransferencia > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-500"><ArrowRightLeft className="h-3 w-3" /> Transferencia</span>
+                    <span className="font-mono text-gray-600">${fmt(gastosTransferencia)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className={clsx(
             "flex justify-between items-center py-3 rounded-lg px-3 mt-2",
@@ -793,12 +1090,36 @@ export default function CajaDiariaPage() {
           )}>
             <span className={clsx("font-semibold flex items-center gap-2", isEfectivoPositive ? "text-blue-700" : "text-red-700")}>
               <Banknote className="h-4 w-4" /> Efectivo en Caja
-              <span className="text-xs font-normal text-gray-400">(sin transferencias)</span>
             </span>
             <span className={clsx("font-mono font-bold text-lg", isEfectivoPositive ? "text-blue-700" : "text-red-700")}>
               ${fmt(efectivoEnCaja)}
             </span>
           </div>
+          {ventasTransferencia > 0 && (
+            <div className={clsx(
+              "flex justify-between items-center py-3 rounded-lg px-3 mt-1",
+              isSaldoTransPositive ? "bg-indigo-50" : "bg-red-50"
+            )}>
+              <span className={clsx("font-semibold flex items-center gap-2", isSaldoTransPositive ? "text-indigo-700" : "text-red-700")}>
+                <ArrowRightLeft className="h-4 w-4" /> Saldo Transferencias
+                <span className="text-xs font-normal text-gray-400">(ingresos − gastos por transferencia)</span>
+              </span>
+              <span className={clsx("font-mono font-bold text-lg", isSaldoTransPositive ? "text-indigo-700" : "text-red-700")}>
+                ${fmt(saldoTransferencias)}
+              </span>
+            </div>
+          )}
+          {totalInversiones > 0 && (
+            <div className="flex justify-between items-center py-3 rounded-lg px-3 mt-1 bg-purple-50">
+              <span className="font-semibold flex items-center gap-2 text-purple-700">
+                <Users className="h-4 w-4" /> Inversiones de Socios
+                <span className="text-xs font-normal text-gray-400">(no afecta caja)</span>
+              </span>
+              <span className="font-mono font-bold text-lg text-purple-700">
+                ${fmt(totalInversiones)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Botón Cerrar / Reabrir Caja */}
