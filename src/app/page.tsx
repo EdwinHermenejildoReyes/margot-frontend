@@ -511,12 +511,13 @@ export default function LandingPage() {
                 <div>
                   <h3 className="font-semibold text-lg">Síguenos</h3>
                   <a
-                    href="https://instagram.com/margot.restobar"
+                    href="https://instagram.com/margotfooddrink"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline text-sm mt-1 inline-block"
+                    className="inline-flex items-center gap-1.5 text-primary hover:underline text-sm mt-1"
                   >
-                    @margot.restobar
+                    <Instagram className="w-4 h-4" />
+                    @margotfooddrink
                   </a>
                 </div>
               </div>

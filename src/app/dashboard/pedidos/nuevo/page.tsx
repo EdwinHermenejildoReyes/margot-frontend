@@ -665,6 +665,9 @@ export default function NuevoPedidoPage() {
           </span>
         </div>
 
+        {/* Scrollable middle: config + cart + notes */}
+        <div className="flex-1 overflow-y-auto lg:min-h-0">
+
         {/* Order Config */}
         <div className="px-5 py-3 border-b border-gray-100 space-y-3">
           {/* Tipo de entrega */}
@@ -797,7 +800,7 @@ export default function NuevoPedidoPage() {
         </div>
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto px-5 py-3">
+        <div className="px-5 py-3">
           {cart.length === 0 && cartPromos.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingCart className="h-10 w-10 text-gray-200 mx-auto mb-3" />
@@ -947,6 +950,8 @@ export default function NuevoPedidoPage() {
             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-brand-gold focus:outline-none resize-none"
           />
         </div>
+
+        </div>{/* end scrollable middle */}
 
         {/* Total & Submit */}
         <div className="px-5 py-4 border-t border-gray-200 bg-gray-50/50 rounded-b-xl space-y-3">
