@@ -12,8 +12,16 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Margot — Food & Drinks | Sistema de Gestión",
-  description: "Panel de administración para Margot Food & Drinks",
+  title: "Margot — Food & Drinks | Restobar en San José - Manglaralto, Santa Elena Ecuador",
+  description: "Cocina de autor, cócteles artesanales y un ambiente único en San José. Reservas, menú y reseñas en margot.rest",
+  keywords: ["restaurante", "restobar", "San José", "Ecuador", "cócteles", "cocina de autor", "Margot"],
+  openGraph: {
+    title: "Margot — Food & Drinks",
+    description: "Cocina de autor, cócteles artesanales y un ambiente único en San José, Ecuador.",
+    type: "website",
+    locale: "es_EC",
+    siteName: "Margot Food & Drinks",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

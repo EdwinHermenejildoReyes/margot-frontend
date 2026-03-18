@@ -1,23 +1,47 @@
 @import "tailwindcss";
 
 /* ─── Margot Brand Theme ─── */
+/* Paleta centralizada con nombres semánticos
+   primary   = #FFC220  (dorado brillante — CTAs, títulos, acentos)
+   secondary = #C37C13  (bronce — hover, acentos cálidos)
+   neutral   = #D7E0D9  (sage — textos secundarios, bordes suaves)
+   dark      = #2F353B  (charcoal — fondos, textos sobre claro)
+*/
 @theme {
-  /* Primary gold */
-  --color-brand-gold: #CC9910;
-  --color-brand-gold-light: #e6b84d;
-  --color-brand-gold-dark: #C37C13;
+  /* ── Primary: Dorado ── */
+  --color-primary: #FFC220;
+  --color-primary-light: #ffd35c;
+  --color-primary-dark: #e6a800;
 
-  /* Bronze / accent */
+  /* ── Secondary: Bronce ── */
+  --color-secondary: #C37C13;
+  --color-secondary-light: #d99a3a;
+  --color-secondary-dark: #a56610;
+
+  /* ── Neutral: Sage ── */
+  --color-neutral: #D7E0D9;
+  --color-neutral-light: #edf1ee;
+  --color-neutral-dark: #b8c4bb;
+
+  /* ── Dark: Charcoal ── */
+  --color-dark: #2F353B;
+  --color-dark-light: #3d454d;
+  --color-dark-deep: #232930;
+
+  /* ── Surface (cards, overlays) ── */
+  --color-surface: #2F353B;
+  --color-surface-light: #3d454d;
+
+  /* ── Backward-compatible aliases (dashboard) ── */
+  --color-brand-gold: #FFC220;
+  --color-brand-gold-light: #ffd35c;
+  --color-brand-gold-dark: #C37C13;
   --color-brand-bronze: #C37C13;
   --color-brand-bronze-light: #d99a3a;
   --color-brand-bronze-dark: #a56610;
-
-  /* Sage green (soft backgrounds) */
   --color-brand-sage: #D7E0D9;
   --color-brand-sage-light: #edf1ee;
   --color-brand-sage-dark: #b8c4bb;
-
-  /* Dark charcoal */
   --color-brand-dark: #2F353B;
   --color-brand-dark-light: #3d454d;
   --color-brand-dark-deep: #232930;
