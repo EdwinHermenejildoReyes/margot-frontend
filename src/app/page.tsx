@@ -176,7 +176,7 @@ export default function LandingPage() {
           src="/fondo_margot.png"
           alt=""
           fill
-          className="object-cover opacity-40"
+          className="object-cover opacity-25"
           priority
         />
         {/* Overlay al 25% para mostrar la imagen */}
@@ -186,7 +186,7 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
           <div className="inline-flex items-center gap-2 bg-dark/40 text-neutral px-4 py-2 rounded-full text-sm font-medium mb-8 backdrop-blur-sm border border-neutral/20">
             <Sparkles className="w-4 h-4" />
-            Restobar en Santa Elena, Ecuador
+            Restobar en San José, Santa Elena
           </div>
 
           <h1 className="text-5xl sm:text-7xl font-bold leading-tight mb-6 drop-shadow-lg">
@@ -279,7 +279,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3">Ambiente Único</h3>
               <p className="text-neutral-dark leading-relaxed">
-                Un espacio diseñado para que disfrutes con amigos, familia o pareja. Música, luces y la mejor vibra de Manglaralto.
+                Un espacio diseñado para que disfrutes con amigos, familia o pareja. Música, luces y la mejor vibra de San José.
               </p>
             </div>
           </div>
@@ -459,7 +459,7 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">Ubicación</h3>
-                  <p className="text-neutral-dark mt-1">San José - Manglaralto, Santa Elena, Ecuador</p>
+                  <p className="text-neutral-dark mt-1">San José, Parroquia Manglaralto, Santa Elena - Ecuador</p>
                   <a
                     href="https://maps.google.com/?q=Margot+Food+Drinks+San+Jose+Manglaralto+Santa+Elena"
                     target="_blank"
@@ -478,10 +478,9 @@ export default function LandingPage() {
                 <div>
                   <h3 className="font-semibold text-lg">Horario</h3>
                   <div className="text-neutral-dark mt-1 space-y-1 text-sm">
-                    <p>Martes a Jueves: 17:00 – 23:00</p>
-                    <p>Viernes y Sábado: 17:00 – 01:00</p>
-                    <p>Domingo: 12:00 – 22:00</p>
-                    <p className="text-neutral-dark/60">Lunes: Cerrado</p>
+                    <p>Jueves y Domingo: 17:00 – 21:00</p>
+                    <p>Viernes y Sábado: 18:00 – 22:00</p>
+                    <p className="text-neutral-dark/60">Lunes a Miércoles: Cerrado</p>
                   </div>
                 </div>
               </div>
