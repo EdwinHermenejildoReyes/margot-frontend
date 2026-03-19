@@ -73,8 +73,15 @@ export default function MenuPage() {
       await api.delete(`/menu-items/${id}/`);
       toast.success("Ítem eliminado");
       fetchItems();
-    } catch {
-      toast.error("Error al eliminar");
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number } };
+      if (error.response?.status === 401) {
+        toast.error("Sesión expirada. Por favor inicia sesión de nuevo.");
+      } else if (error.response?.status === 403) {
+        toast.error("No tienes permisos para eliminar ítems.");
+      } else {
+        toast.error("Error al eliminar");
+      }
     }
   };
 

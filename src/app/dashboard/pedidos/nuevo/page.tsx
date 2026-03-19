@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque, Promocion } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
@@ -22,6 +23,7 @@ import {
   Truck,
   Sparkles,
   Tag,
+  CalendarDays,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -46,6 +48,7 @@ interface CartPromo {
 export default function NuevoPedidoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
 
   // Pre-fill from query params (when coming from Mesas page)
   const preselectedMesa = searchParams.get("mesa");
@@ -100,6 +103,9 @@ export default function NuevoPedidoPage() {
     secciones: string[];
   } | null>(null);
   const [validandoCodigo, setValidandoCodigo] = useState(false);
+
+  /* ── Fecha personalizada (solo staff) ── */
+  const [fechaPedido, setFechaPedido] = useState("");
 
   /* ── Fetch data ── */
   useEffect(() => {
@@ -353,10 +359,47 @@ export default function NuevoPedidoPage() {
     [costoDelivery]
   );
 
+  /* ── Pizza detection & empaque filtering ── */
+  const hasPizzaInCart = useMemo(
+    () => cart.some((c) => c.menuItem.category_name?.toLowerCase().includes("pizza")),
+    [cart]
+  );
+
+  const filteredEmpaques = useMemo(
+    () => tiposEmpaque.filter((t) => {
+      if (t.nombre.toLowerCase().includes("pizza") && !hasPizzaInCart) return false;
+      return true;
+    }),
+    [tiposEmpaque, hasPizzaInCart]
+  );
+
   const grandTotal = useMemo(
     () => cartTotal + promosTotal + empaquesTotal + deliveryTotal - (codigoDescuento ? parseFloat(codigoDescuento.monto_descuento) : 0),
     [cartTotal, promosTotal, empaquesTotal, deliveryTotal, codigoDescuento]
   );
+
+  /* ── Auto-select caja de pizza when pizza is in cart ── */
+  useEffect(() => {
+    if (tipoEntrega === "local") return;
+    const cajaPizza = tiposEmpaque.find((t) => t.nombre.toLowerCase().includes("pizza"));
+    if (!cajaPizza) return;
+
+    if (hasPizzaInCart) {
+      setCartEmpaques((prev) => {
+        if (prev.has(cajaPizza.id)) return prev;
+        const next = new Map(prev);
+        next.set(cajaPizza.id, 1);
+        return next;
+      });
+    } else {
+      setCartEmpaques((prev) => {
+        if (!prev.has(cajaPizza.id)) return prev;
+        const next = new Map(prev);
+        next.delete(cajaPizza.id);
+        return next;
+      });
+    }
+  }, [hasPizzaInCart, tipoEntrega, tiposEmpaque]);
 
   /* ── Empaques helpers ── */
   const updateEmpaqueCantidad = (tipoId: number, delta: number) => {
@@ -415,6 +458,10 @@ export default function NuevoPedidoPage() {
 
     // Warn if "para llevar" or "domicilio" and no empaques selected
     if (!skipEmpaqueCheck && tipoEntrega !== "local" && cartEmpaques.size === 0) {
+      if (tipoEntrega === "domicilio") {
+        toast.error("Selecciona al menos un empaque para delivery");
+        return;
+      }
       setShowEmpaqueWarning(true);
       return;
     }
@@ -441,6 +488,7 @@ export default function NuevoPedidoPage() {
           ...(cp.selectedItem ? { menu_item_seleccionado: cp.selectedItem.id } : {}),
         })),
         ...(codigoDescuento ? { codigo_descuento: codigoDescuento.codigo_id } : {}),
+        ...(fechaPedido && user?.is_staff ? { fecha_pedido: new Date(fechaPedido).toISOString() } : {}),
       };
 
       if (tipoEntrega === "local") {
@@ -787,14 +835,14 @@ export default function NuevoPedidoPage() {
           )}
 
           {/* Empaques selector (para llevar / domicilio) */}
-          {tipoEntrega !== "local" && tiposEmpaque.length > 0 && (
+          {tipoEntrega !== "local" && filteredEmpaques.length > 0 && (
             <div>
               <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
                 <Package className="h-3.5 w-3.5" />
-                Empaques
+                Empaques {tipoEntrega === "domicilio" && <span className="text-red-400">(mín. 1)</span>}
               </label>
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {tiposEmpaque.map((tipo) => {
+                {filteredEmpaques.map((tipo) => {
                   const cant = cartEmpaques.get(tipo.id) || 0;
                   return (
                     <div key={tipo.id} className="flex items-center justify-between gap-2">
@@ -841,6 +889,33 @@ export default function NuevoPedidoPage() {
                 placeholder="0.00"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
               />
+            </div>
+          )}
+
+          {/* Fecha personalizada (solo staff/superusuario) */}
+          {user?.is_staff && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Fecha del Pedido
+              </label>
+              <input
+                type="datetime-local"
+                value={fechaPedido}
+                onChange={(e) => setFechaPedido(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+              />
+              {fechaPedido && (
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-[10px] text-amber-600">Se registrará con esta fecha</p>
+                  <button
+                    onClick={() => setFechaPedido("")}
+                    className="text-[10px] text-gray-400 hover:text-red-500"
+                  >
+                    Usar fecha actual
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
