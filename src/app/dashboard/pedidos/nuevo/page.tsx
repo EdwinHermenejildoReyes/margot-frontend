@@ -21,6 +21,7 @@ import {
   Package,
   Truck,
   Sparkles,
+  Tag,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -86,6 +87,19 @@ export default function NuevoPedidoPage() {
   const [tiposEmpaque, setTiposEmpaque] = useState<TipoEmpaque[]>([]);
   const [cartEmpaques, setCartEmpaques] = useState<Map<number, number>>(new Map()); // tipoEmpaqueId → cantidad
   const [costoDelivery, setCostoDelivery] = useState<string>("");
+
+  /* ── Código de descuento ── */
+  const [codigoInput, setCodigoInput] = useState("");
+  const [codigoDescuento, setCodigoDescuento] = useState<{
+    codigo_id: number;
+    tipo: string;
+    nombre_titular: string;
+    porcentaje: string;
+    subtotal_aplicable: string;
+    monto_descuento: string;
+    secciones: string[];
+  } | null>(null);
+  const [validandoCodigo, setValidandoCodigo] = useState(false);
 
   /* ── Fetch data ── */
   useEffect(() => {
@@ -340,8 +354,8 @@ export default function NuevoPedidoPage() {
   );
 
   const grandTotal = useMemo(
-    () => cartTotal + promosTotal + empaquesTotal + deliveryTotal,
-    [cartTotal, promosTotal, empaquesTotal, deliveryTotal]
+    () => cartTotal + promosTotal + empaquesTotal + deliveryTotal - (codigoDescuento ? parseFloat(codigoDescuento.monto_descuento) : 0),
+    [cartTotal, promosTotal, empaquesTotal, deliveryTotal, codigoDescuento]
   );
 
   /* ── Empaques helpers ── */
@@ -357,6 +371,37 @@ export default function NuevoPedidoPage() {
   };
 
   /* ── Submit order ── */
+  const handleValidarCodigo = async () => {
+    const code = codigoInput.trim();
+    if (!code) {
+      toast.error("Ingresa un código de descuento");
+      return;
+    }
+    if (cart.length === 0) {
+      toast.error("Agrega ítems regulares al pedido antes de validar el código (no aplica a promociones)");
+      return;
+    }
+    setValidandoCodigo(true);
+    try {
+      const res = await api.post("/codigos-descuento/validar/", {
+        codigo: code,
+        detalles: cart.map((c) => ({ menu_item: c.menuItem.id, cantidad: c.cantidad })),
+      });
+      setCodigoDescuento(res.data);
+      toast.success(`Descuento ${res.data.porcentaje}% aplicado — ${res.data.nombre_titular}`);
+    } catch {
+      setCodigoDescuento(null);
+      toast.error("Código inválido o inactivo");
+    } finally {
+      setValidandoCodigo(false);
+    }
+  };
+
+  const handleRemoverCodigo = () => {
+    setCodigoDescuento(null);
+    setCodigoInput("");
+  };
+
   const handleSubmit = async (skipEmpaqueCheck = false) => {
     if (cart.length === 0 && cartPromos.length === 0) {
       toast.error("Agrega al menos un ítem o promoción al pedido");
@@ -395,6 +440,7 @@ export default function NuevoPedidoPage() {
           cantidad: cp.cantidad,
           ...(cp.selectedItem ? { menu_item_seleccionado: cp.selectedItem.id } : {}),
         })),
+        ...(codigoDescuento ? { codigo_descuento: codigoDescuento.codigo_id } : {}),
       };
 
       if (tipoEntrega === "local") {
@@ -951,6 +997,57 @@ export default function NuevoPedidoPage() {
           />
         </div>
 
+        {/* Discount code */}
+        <div className="px-5 py-3 border-t border-gray-100">
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            <Tag className="inline h-3 w-3 mr-1" />
+            Código de descuento (opcional)
+          </label>
+          {codigoDescuento ? (
+            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <div>
+                <p className="text-xs font-semibold text-green-700">
+                  {codigoDescuento.porcentaje}% — {codigoDescuento.nombre_titular}
+                </p>
+                <p className="text-[10px] text-green-600">
+                  {codigoDescuento.tipo === "socio" ? "Socio" : "Empleado"}
+                  {codigoDescuento.secciones.length > 0
+                    ? ` · Solo: ${codigoDescuento.secciones.join(", ")}`
+                    : " · Todo el menú"}
+                  {" · No aplica a promos"}
+                </p>
+                <p className="text-[10px] text-green-700 font-medium mt-0.5">
+                  Base: ${parseFloat(codigoDescuento.subtotal_aplicable).toFixed(2)} → Dcto: -${parseFloat(codigoDescuento.monto_descuento).toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={handleRemoverCodigo}
+                className="p-1 rounded hover:bg-green-100 text-green-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ej: SOCIO-001"
+                value={codigoInput}
+                onChange={(e) => setCodigoInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && handleValidarCodigo()}
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-brand-gold focus:outline-none uppercase"
+              />
+              <button
+                onClick={handleValidarCodigo}
+                disabled={validandoCodigo || !codigoInput.trim()}
+                className="px-3 py-2 rounded-lg bg-brand-gold text-white text-xs font-medium hover:bg-brand-bronze disabled:opacity-50 transition-colors"
+              >
+                {validandoCodigo ? "..." : "Aplicar"}
+              </button>
+            </div>
+          )}
+        </div>
+
         </div>{/* end scrollable middle */}
 
         {/* Total & Submit */}
@@ -975,6 +1072,14 @@ export default function NuevoPedidoPage() {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Delivery</span>
               <span className="text-sm text-gray-700">${deliveryTotal.toFixed(2)}</span>
+            </div>
+          )}
+          {codigoDescuento && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-green-600">
+                Dcto {codigoDescuento.porcentaje}% sobre ${parseFloat(codigoDescuento.subtotal_aplicable).toFixed(2)}
+              </span>
+              <span className="text-sm font-medium text-green-600">-${parseFloat(codigoDescuento.monto_descuento).toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between items-center">
