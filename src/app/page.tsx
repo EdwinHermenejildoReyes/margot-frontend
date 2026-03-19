@@ -33,6 +33,7 @@ interface MenuItemPublic {
 interface CategoriaPublic {
   id: number;
   nombre: string;
+  imagen: string | null;
   items: MenuItemPublic[];
 }
 
@@ -43,6 +44,28 @@ interface ResenaPublic {
   comentario: string;
   created_at: string;
 }
+
+interface ContactoPublic {
+  nombre?: string;
+  direccion?: string;
+  telefono?: string;
+  google_maps_url?: string;
+  google_maps_embed?: string;
+  instagram_url?: string;
+  instagram_handle?: string;
+  whatsapp_numero?: string;
+}
+
+/* ── Valores por defecto ── */
+const DEFAULT_CONTACTO: ContactoPublic = {
+  direccion: "San José, Parroquia Manglaralto, Santa Elena - Ecuador",
+  telefono: "+593997012527",
+  google_maps_url: "https://www.google.com/maps/place/MARGOT+Food%26Drink/@-1.7596217,-80.7681302,17z/data=!3m1!4b1!4m6!3m5!1s0x902c2b90f0e58a1b:0x5e5dd1e44275da42!8m2!3d-1.7596217!4d-80.7681302!16s%2Fg%2F11lnj0w0hw",
+  google_maps_embed: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3987.2!2d-80.7681302!3d-1.7596217!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x902c2b90f0e58a1b%3A0x5e5dd1e44275da42!2sMARGOT%20Food%26Drink!5e0!3m2!1ses!2sec!4v1",
+  instagram_url: "https://instagram.com/margotfooddrink",
+  instagram_handle: "@margotfooddrink",
+  whatsapp_numero: "593997012527",
+};
 
 /* ── API base ── */
 function getApiBase(): string {
@@ -90,6 +113,7 @@ function StarsInput({ value, onChange }: { value: number; onChange: (v: number) 
 export default function LandingPage() {
   const [menu, setMenu] = useState<CategoriaPublic[]>([]);
   const [resenas, setResenas] = useState<ResenaPublic[]>([]);
+  const [contacto, setContacto] = useState<ContactoPublic>(DEFAULT_CONTACTO);
   const [loadingMenu, setLoadingMenu] = useState(true);
 
   /* Reseña form */
@@ -103,9 +127,13 @@ export default function LandingPage() {
     Promise.all([
       fetch(`${base}/public/menu/landing/`).then((r) => r.json()).catch(() => []),
       fetch(`${base}/public/resenas/`).then((r) => r.json()).catch(() => ({ results: [] })),
-    ]).then(([menuData, resenasData]) => {
+      fetch(`${base}/public/info/contacto/`).then((r) => r.json()).catch(() => ({})),
+    ]).then(([menuData, resenasData, contactoData]) => {
       setMenu(menuData);
       setResenas(Array.isArray(resenasData) ? resenasData : resenasData.results || []);
+      if (contactoData && Object.keys(contactoData).length > 0) {
+        setContacto({ ...DEFAULT_CONTACTO, ...contactoData });
+      }
       setLoadingMenu(false);
     });
   }, []);
@@ -286,7 +314,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══ MENÚ DESTACADO ═══ */}
+      {/* ═══ MENÚ ═══ */}
       <section id="menu" className="py-24 bg-dark">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
@@ -296,7 +324,7 @@ export default function LandingPage() {
               <span className="text-primary">sabores</span>
             </h2>
             <p className="text-neutral-dark mt-4 max-w-xl mx-auto">
-              Una selección de nuestros platos y bebidas más populares. ¡Ven y pruébalos todos!
+              Explora nuestras categorías y encuentra tu plato o bebida favorita.
             </p>
           </div>
 
@@ -307,50 +335,48 @@ export default function LandingPage() {
           ) : menu.length === 0 ? (
             <p className="text-center text-neutral-dark py-12">Pronto publicaremos nuestro menú. ¡Visítanos para descubrirlo!</p>
           ) : (
-            <div className="space-y-16">
-              {menu.map((cat) => (
-                <div key={cat.id}>
-                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                    <span className="w-8 h-0.5 bg-primary" />
-                    {cat.nombre}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {cat.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className={clsx(
-                          "group bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:bg-white/10 transition-all hover:border-primary/30",
-                          item.es_destacado && "ring-1 ring-primary/30"
-                        )}
-                      >
-                        {item.imagen && (
-                          <div className="relative h-44 overflow-hidden">
-                            <img
-                              src={item.imagen}
-                              alt={item.nombre}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                            {item.es_destacado && (
-                              <span className="absolute top-3 right-3 bg-primary text-dark text-xs font-bold px-2 py-1 rounded-full">
-                                Popular
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <div className="p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-semibold text-white">{item.nombre}</h4>
-                            <span className="text-primary font-bold whitespace-nowrap">${item.precio}</span>
-                          </div>
-                          {item.descripcion && (
-                            <p className="text-sm text-neutral-dark mt-1 line-clamp-2">{item.descripcion}</p>
-                          )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {menu.map((cat) => {
+                const previewImg = cat.imagen || cat.items.find((i) => i.imagen)?.imagen;
+                return (
+                  <Link
+                    key={cat.id}
+                    href={`/menu?categoria=${cat.id}`}
+                    className="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-primary/40 transition-all hover:shadow-lg hover:shadow-primary/10"
+                  >
+                    {/* Image */}
+                    <div className="relative h-52 bg-dark-deep">
+                      {previewImg ? (
+                        <img
+                          src={previewImg}
+                          alt={cat.nombre}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Utensils className="w-12 h-12 text-neutral-dark/50" />
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                      )}
+                      {/* Gradient overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-dark via-dark/40 to-transparent" />
+                    </div>
+
+                    {/* Content */}
+                    <div className="absolute bottom-0 left-0 right-0 p-5">
+                      <h3 className="text-xl font-bold text-white mb-1">{cat.nombre}</h3>
+                      <p className="text-sm text-neutral-dark">
+                        {cat.items.length} {cat.items.length === 1 ? "producto" : "productos"}
+                      </p>
+                      <span className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-primary group-hover:gap-2.5 transition-all">
+                        Ver productos
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
@@ -459,15 +485,17 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">Ubicación</h3>
-                  <p className="text-neutral-dark mt-1">San José, Parroquia Manglaralto, Santa Elena - Ecuador</p>
-                  <a
-                    href="https://maps.google.com/?q=Margot+Food+Drinks+San+Jose+Manglaralto+Santa+Elena"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary text-sm hover:underline mt-1 inline-block"
-                  >
-                    Ver en Google Maps →
-                  </a>
+                  <p className="text-neutral-dark mt-1">{contacto.direccion}</p>
+                  {contacto.google_maps_url && (
+                    <a
+                      href={contacto.google_maps_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary text-sm hover:underline mt-1 inline-block"
+                    >
+                      Ver en Google Maps →
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -492,15 +520,17 @@ export default function LandingPage() {
                 <div>
                   <h3 className="font-semibold text-lg">Reservas</h3>
                   <p className="text-neutral-dark mt-1">WhatsApp / Llamadas</p>
-                  <a
-                    href="https://wa.me/593999999999"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 mt-3 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                  >
-                    <Phone className="w-4 h-4" />
-                    Escribir por WhatsApp
-                  </a>
+                  {contacto.whatsapp_numero && (
+                    <a
+                      href={`https://wa.me/${contacto.whatsapp_numero}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-3 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                    >
+                      <Phone className="w-4 h-4" />
+                      Escribir por WhatsApp
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -511,13 +541,13 @@ export default function LandingPage() {
                 <div>
                   <h3 className="font-semibold text-lg">Síguenos</h3>
                   <a
-                    href="https://instagram.com/margotfooddrink"
+                    href={contacto.instagram_url || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-primary hover:underline text-sm mt-1"
                   >
                     <Instagram className="w-4 h-4" />
-                    @margotfooddrink
+                    {contacto.instagram_handle || "@margotfooddrink"}
                   </a>
                 </div>
               </div>
@@ -525,7 +555,7 @@ export default function LandingPage() {
 
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden min-h-[350px] flex items-center justify-center">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15949.5!2d-80.75!3d-1.83!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sManglaralto%2C+Santa+Elena!5e0!3m2!1ses!2sec!4v1"
+                src={contacto.google_maps_embed || ""}
                 width="100%"
                 height="100%"
                 style={{ border: 0, minHeight: "350px" }}
