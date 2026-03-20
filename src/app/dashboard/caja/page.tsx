@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import type { ResumenDia, GastoDiario, InversionSocio } from "@/lib/types";
+import type { ResumenDia, GastoDiario, InversionSocio, InventarioItem, CategoriaInsumo, UnidadMedida } from "@/lib/types";
 import {
   Landmark,
   DollarSign,
@@ -113,11 +113,27 @@ export default function CajaDiariaPage() {
   /* Gastos */
   const [gastosOpen, setGastosOpen] = useState(false);
   const [showGastoForm, setShowGastoForm] = useState(false);
-  const [gastoDesc, setGastoDesc] = useState("");
-  const [gastoMonto, setGastoMonto] = useState("");
   const [gastoCategoria, setGastoCategoria] = useState("otros");
   const [gastoMedioPago, setGastoMedioPago] = useState("efectivo");
+  const [gastoMonto, setGastoMonto] = useState("");
   const [savingGasto, setSavingGasto] = useState(false);
+
+  /* Insumos (vinculación con inventario) */
+  const [insumos, setInsumos] = useState<InventarioItem[]>([]);
+  const [categoriasInsumo, setCategoriasInsumo] = useState<CategoriaInsumo[]>([]);
+  const [unidadesMedida, setUnidadesMedida] = useState<UnidadMedida[]>([]);
+  const [gastoArea, setGastoArea] = useState<"cocina" | "barra">("cocina");
+  const [gastoInsumo, setGastoInsumo] = useState<string>("");
+  const [gastoUnidades, setGastoUnidades] = useState("");
+  const [gastoPesoUnidad, setGastoPesoUnidad] = useState("");
+  const [gastoUnidadCompra, setGastoUnidadCompra] = useState("kg");
+
+  /* Crear nuevo insumo inline */
+  const [creandoInsumo, setCreandoInsumo] = useState(false);
+  const [nuevoInsumoNombre, setNuevoInsumoNombre] = useState("");
+  const [nuevoInsumoCategoria, setNuevoInsumoCategoria] = useState("");
+  const [nuevoInsumoUnidad, setNuevoInsumoUnidad] = useState("");
+  const [savingNuevoInsumo, setSavingNuevoInsumo] = useState(false);
 
   /* Inversiones */
   const [inversionesOpen, setInversionesOpen] = useState(false);
@@ -160,6 +176,67 @@ export default function CajaDiariaPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  /* Cargar insumos, categorías y unidades cuando se elige "insumos" */
+  useEffect(() => {
+    if (gastoCategoria === "insumos") {
+      api.get(`/inventario/?is_active=true&ordering=nombre&page_size=200`)
+        .then((res) => setInsumos(res.data?.results ?? res.data ?? []))
+        .catch(() => setInsumos([]));
+      api.get(`/categorias-insumo/?ordering=nombre`)
+        .then((res) => setCategoriasInsumo(res.data?.results ?? res.data ?? []))
+        .catch(() => setCategoriasInsumo([]));
+      api.get(`/unidades-medida/?ordering=nombre`)
+        .then((res) => setUnidadesMedida(res.data?.results ?? res.data ?? []))
+        .catch(() => setUnidadesMedida([]));
+    }
+  }, [gastoCategoria]);
+
+  /* Insumos filtrados por área seleccionada */
+  const insumosFiltrados = insumos.filter(
+    (i) => i.categoria_area === gastoArea
+  );
+
+  /* Insumo seleccionado */
+  const selectedInsumo = insumos.find((i) => i.id === Number(gastoInsumo));
+  const isUnitBased = selectedInsumo
+    ? selectedInsumo.unidad !== "g" && selectedInsumo.unidad !== "ml"
+    : false;
+
+  /* Cálculos de conversión para insumos */
+  const unidades = Number(gastoUnidades) || 0;
+  const pesoUnidad = Number(gastoPesoUnidad) || 0;
+  const unidadCompra = gastoUnidadCompra;
+
+  // Para items por unidad: unidades (cajas) × cantidad por caja = total unidades
+  // Para items por peso: unidades × peso por unidad → conversión a base
+  let cantidadEnBase = 0;
+  let unidadBase = "";
+  let totalDisplay = 0;
+
+  if (selectedInsumo) {
+    unidadBase = selectedInsumo.unidad ?? "";
+    if (isUnitBased) {
+      // Barra / unidades: cajas × unids_por_caja = total und
+      totalDisplay = unidades * pesoUnidad;
+      cantidadEnBase = totalDisplay;
+    } else {
+      const pesoTotal = unidades * pesoUnidad;
+      totalDisplay = pesoTotal;
+      if (unidadCompra === "kg" && unidadBase === "g") {
+        cantidadEnBase = pesoTotal * 1000;
+      } else if (unidadCompra === "lb" && unidadBase === "g") {
+        cantidadEnBase = pesoTotal * 453.592;
+      } else if (unidadCompra === "L" && unidadBase === "ml") {
+        cantidadEnBase = pesoTotal * 1000;
+      } else {
+        cantidadEnBase = pesoTotal;
+      }
+    }
+  }
+  const porciones100 = !isUnitBased && (unidadBase === "g" || unidadBase === "ml")
+    ? Math.floor(cantidadEnBase / 100)
+    : 0;
 
   /* ── Guardar / Crear cierre de caja ── */
   const handleSaveCaja = async () => {
@@ -216,30 +293,125 @@ export default function CajaDiariaPage() {
       toast.error("Primero debe crear la caja del día (guardar apertura)");
       return;
     }
-    if (!gastoDesc.trim() || !gastoMonto || isNaN(Number(gastoMonto)) || Number(gastoMonto) <= 0) {
-      toast.error("Complete descripción y monto válido");
+
+    // Validar monto
+    if (!gastoMonto || isNaN(Number(gastoMonto)) || Number(gastoMonto) <= 0) {
+      toast.error("Ingrese un monto válido");
       return;
     }
+
+    // Si es insumo, validar que haya insumo seleccionado y datos de compra
+    if (gastoCategoria === "insumos" && gastoInsumo) {
+      if (!gastoUnidades || Number(gastoUnidades) <= 0) {
+        toast.error("Ingrese la cantidad de unidades compradas");
+        return;
+      }
+      if (!gastoPesoUnidad || Number(gastoPesoUnidad) <= 0) {
+        toast.error(isUnitBased ? "Ingrese las unidades por caja" : "Ingrese el peso por unidad");
+        return;
+      }
+    }
+
+    // Auto-generar descripción
+    const catLabel = CATEGORIAS_GASTO.find((c) => c.value === gastoCategoria)?.label ?? gastoCategoria;
+    let descripcion = catLabel;
+    if (gastoCategoria === "insumos" && selectedInsumo) {
+      if (isUnitBased) {
+        descripcion = `${selectedInsumo.nombre} — ${unidades} cajas × ${pesoUnidad} und = ${cantidadEnBase} und`;
+      } else {
+        const pesoTotal = unidades * pesoUnidad;
+        descripcion = `${selectedInsumo.nombre} — ${unidades} uds × ${pesoUnidad} ${unidadCompra} = ${pesoTotal.toFixed(2)} ${unidadCompra}`;
+      }
+    }
+
     setSavingGasto(true);
     try {
-      await api.post("/gastos-diarios/", {
+      const payload: Record<string, unknown> = {
         cierre_caja: data.cierre_caja.id,
-        descripcion: gastoDesc.trim(),
+        descripcion,
         monto: gastoMonto,
         categoria: gastoCategoria,
         medio_pago: gastoMedioPago,
-      });
-      toast.success("Gasto registrado");
-      setGastoDesc("");
-      setGastoMonto("");
-      setGastoCategoria("otros");
-      setGastoMedioPago("efectivo");
-      setShowGastoForm(false);
+      };
+      if (gastoCategoria === "insumos" && gastoInsumo && cantidadEnBase > 0) {
+        payload.insumo = Number(gastoInsumo);
+        payload.cantidad_insumo = cantidadEnBase.toFixed(3);
+        // Costo unitario por unidad base = monto total / cantidad en base
+        const costoUnit = Number(gastoMonto) / cantidadEnBase;
+        payload.costo_unitario_insumo = costoUnit.toFixed(4);
+      }
+      await api.post("/gastos-diarios/", payload);
+      toast.success(
+        gastoCategoria === "insumos" && gastoInsumo
+          ? "Gasto registrado e inventario actualizado"
+          : "Gasto registrado"
+      );
+      resetGastoForm();
       fetchData();
     } catch {
       toast.error("Error al registrar gasto");
     } finally {
       setSavingGasto(false);
+    }
+  };
+
+  const resetGastoForm = () => {
+    setGastoCategoria("otros");
+    setGastoMedioPago("efectivo");
+    setGastoMonto("");
+    setGastoArea("cocina");
+    setGastoInsumo("");
+    setGastoUnidades("");
+    setGastoPesoUnidad("");
+    setGastoUnidadCompra("kg");
+    setCreandoInsumo(false);
+    setNuevoInsumoNombre("");
+    setNuevoInsumoCategoria("");
+    setNuevoInsumoUnidad("");
+    setShowGastoForm(false);
+  };
+
+  /* ── Crear nuevo insumo inline ── */
+  const handleCreateInsumo = async () => {
+    if (!nuevoInsumoNombre.trim()) {
+      toast.error("Ingrese el nombre del insumo");
+      return;
+    }
+    if (!nuevoInsumoCategoria) {
+      toast.error("Seleccione una categoría");
+      return;
+    }
+    if (!nuevoInsumoUnidad) {
+      toast.error("Seleccione la unidad de medida");
+      return;
+    }
+    setSavingNuevoInsumo(true);
+    try {
+      const res = await api.post("/inventario/", {
+        nombre: nuevoInsumoNombre.trim(),
+        categoria_insumo: Number(nuevoInsumoCategoria),
+        unidad_medida: Number(nuevoInsumoUnidad),
+      });
+      const nuevo: InventarioItem = res.data;
+      // Refrescar lista de insumos y auto-seleccionar el nuevo
+      const listRes = await api.get(`/inventario/?is_active=true&ordering=nombre&page_size=200`);
+      setInsumos(listRes.data?.results ?? listRes.data ?? []);
+      setGastoInsumo(String(nuevo.id));
+      // Auto-asignar unidad de compra
+      const u = nuevo.unidad ?? "";
+      if (u === "g") setGastoUnidadCompra("kg");
+      else if (u === "ml") setGastoUnidadCompra("L");
+      else setGastoUnidadCompra(u);
+      // Limpiar form de nuevo insumo
+      setCreandoInsumo(false);
+      setNuevoInsumoNombre("");
+      setNuevoInsumoCategoria("");
+      setNuevoInsumoUnidad("");
+      toast.success(`Insumo "${nuevo.nombre}" creado`);
+    } catch {
+      toast.error("Error al crear el insumo");
+    } finally {
+      setSavingNuevoInsumo(false);
     }
   };
 
@@ -706,6 +878,12 @@ export default function CajaDiariaPage() {
                           <> &middot; {new Date(g.created_at).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })}</>
                         )}
                       </p>
+                      {g.insumo_nombre && (
+                        <p className="text-xs text-blue-600 mt-0.5">
+                          📦 {g.insumo_nombre}: +{Number(g.cantidad_insumo).toFixed(1)} {g.unidad_medida}
+                          {g.costo_unitario_insumo && <> &middot; ${Number(g.costo_unitario_insumo).toFixed(4)}/{g.unidad_medida}</>}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={clsx(
@@ -749,47 +927,296 @@ export default function CajaDiariaPage() {
                 <Plus className="h-4 w-4" />
                 Agregar Gasto
               </button>
-            ) : (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+            ) : showGastoForm && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
                 <h3 className="text-sm font-semibold text-gray-900">Nuevo Gasto</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1">Descripción</label>
-                    <input
-                      type="text"
-                      value={gastoDesc}
-                      onChange={(e) => setGastoDesc(e.target.value)}
-                      placeholder="Compra de insumos, pago de luz..."
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Monto ($)</label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={gastoMonto}
-                      onChange={(e) => setGastoMonto(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
-                    />
-                  </div>
-                </div>
+
+                {/* 1. Categoría */}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Categoría</label>
                   <select
                     value={gastoCategoria}
-                    onChange={(e) => setGastoCategoria(e.target.value)}
+                    onChange={(e) => {
+                      setGastoCategoria(e.target.value);
+                      setGastoInsumo("");
+                      setGastoUnidades("");
+                      setGastoPesoUnidad("");
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
                   >
                     {CATEGORIAS_GASTO.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
+                      <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
                   </select>
                 </div>
+
+                {/* 2. Si es Insumos: Área + Insumo + Detalles de compra */}
+                {gastoCategoria === "insumos" && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-blue-700 flex items-center gap-1">
+                      <ShoppingCart className="h-3.5 w-3.5" />
+                      Compra de Insumo
+                    </p>
+
+                    {/* Área: Cocina / Barra */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Área</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(["cocina", "barra"] as const).map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => { setGastoArea(a); setGastoInsumo(""); setCreandoInsumo(false); }}
+                            className={clsx(
+                              "px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
+                              gastoArea === a
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                            )}
+                          >
+                            {a === "cocina" ? "🍳 Cocina" : "🍸 Barra"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Selector de insumo filtrado por área */}
+                    {!creandoInsumo ? (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Insumo</label>
+                          <select
+                            value={gastoInsumo}
+                            onChange={(e) => {
+                              setGastoInsumo(e.target.value);
+                              setGastoUnidades("");
+                              setGastoPesoUnidad("");
+                              // Auto-asignar unidad de compra según unidad del insumo
+                              const ins = insumos.find((i) => i.id === Number(e.target.value));
+                              if (ins) {
+                                const u = ins.unidad ?? "";
+                                if (u === "g") setGastoUnidadCompra("kg");
+                                else if (u === "ml") setGastoUnidadCompra("L");
+                                else setGastoUnidadCompra(u);
+                              }
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                          >
+                            <option value="">— Seleccione insumo —</option>
+                            {insumosFiltrados.map((ins) => (
+                              <option key={ins.id} value={ins.id}>
+                                {ins.nombre} ({ins.unidad ?? "u"} — Stock: {Number(ins.stock_actual).toFixed(1)})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCreandoInsumo(true)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                        >
+                          <Plus className="h-3 w-3" /> ¿No lo encuentras? Crear nuevo insumo
+                        </button>
+                      </div>
+                    ) : (
+                      /* ── Mini-form crear nuevo insumo ── */
+                      <div className="bg-white border border-blue-300 rounded-lg p-3 space-y-3">
+                        <p className="text-xs font-semibold text-blue-700">Nuevo insumo</p>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Nombre</label>
+                          <input
+                            type="text"
+                            value={nuevoInsumoNombre}
+                            onChange={(e) => setNuevoInsumoNombre(e.target.value)}
+                            placeholder="Ej: Alitas"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Categoría</label>
+                            <select
+                              value={nuevoInsumoCategoria}
+                              onChange={(e) => setNuevoInsumoCategoria(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                            >
+                              <option value="">— Categoría —</option>
+                              {categoriasInsumo
+                                .filter((c) => c.area === gastoArea)
+                                .map((c) => (
+                                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                                ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Unidad de medida</label>
+                            <select
+                              value={nuevoInsumoUnidad}
+                              onChange={(e) => setNuevoInsumoUnidad(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                            >
+                              <option value="">— Unidad —</option>
+                              {unidadesMedida.map((u) => (
+                                <option key={u.id} value={u.id}>{u.abreviatura} — {u.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCreateInsumo}
+                            disabled={savingNuevoInsumo}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            {savingNuevoInsumo ? "Creando..." : "Crear insumo"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreandoInsumo(false);
+                              setNuevoInsumoNombre("");
+                              setNuevoInsumoCategoria("");
+                              setNuevoInsumoUnidad("");
+                            }}
+                            className="px-3 py-1.5 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg text-xs font-medium transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Detalles de compra (solo si insumo seleccionado) */}
+                    {gastoInsumo && selectedInsumo && (
+                      <div className="space-y-3">
+                        {isUnitBased ? (
+                          /* ── Compra por unidades (barra: cajas × und/caja) ── */
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Cajas / paquetes</label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={gastoUnidades}
+                                onChange={(e) => setGastoUnidades(e.target.value)}
+                                placeholder="Ej: 2"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Unidades por caja</label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={gastoPesoUnidad}
+                                onChange={(e) => setGastoPesoUnidad(e.target.value)}
+                                placeholder="Ej: 24"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          /* ── Compra por peso (cocina: unidades × peso × conversión) ── */
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Unidades</label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={gastoUnidades}
+                                onChange={(e) => setGastoUnidades(e.target.value)}
+                                placeholder="Ej: 3"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Peso por unidad</label>
+                              <input
+                                type="number"
+                                min="0.001"
+                                step="0.001"
+                                value={gastoPesoUnidad}
+                                onChange={(e) => setGastoPesoUnidad(e.target.value)}
+                                placeholder="Ej: 1.13"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Unidad compra</label>
+                              <select
+                                value={gastoUnidadCompra}
+                                onChange={(e) => setGastoUnidadCompra(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                              >
+                                {selectedInsumo.unidad === "g" && (
+                                  <>
+                                    <option value="kg">kg</option>
+                                    <option value="lb">lb</option>
+                                    <option value="g">g</option>
+                                  </>
+                                )}
+                                {selectedInsumo.unidad === "ml" && (
+                                  <>
+                                    <option value="L">L</option>
+                                    <option value="ml">ml</option>
+                                  </>
+                                )}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Resumen de conversión */}
+                        {cantidadEnBase > 0 && (
+                          <div className="bg-white border border-blue-200 rounded-lg p-3 space-y-1.5">
+                            {isUnitBased ? (
+                              <p className="text-xs font-medium text-gray-700">
+                                Total: <span className="text-blue-700 font-bold">{unidades} {unidades === 1 ? "caja" : "cajas"} × {pesoUnidad} und = {cantidadEnBase} und</span>
+                              </p>
+                            ) : (
+                              <>
+                                <p className="text-xs font-medium text-gray-700">
+                                  Peso total: <span className="text-blue-700 font-bold">{totalDisplay.toFixed(2)} {unidadCompra}</span>
+                                  {" "}({unidades} uds × {pesoUnidad} {unidadCompra})
+                                </p>
+                                {cantidadEnBase > 0 && unidadBase !== unidadCompra && (
+                                  <p className="text-xs text-gray-600">
+                                    Conversión: <span className="text-blue-700 font-bold">{cantidadEnBase.toFixed(1)} {unidadBase}</span>
+                                  </p>
+                                )}
+                                {porciones100 > 0 && (
+                                  <p className="text-xs text-emerald-700 font-medium">
+                                    Porciones de 100{unidadBase}: <span className="font-bold">{porciones100}</span> porciones
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. Monto total */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Monto total ($)</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={gastoMonto}
+                    onChange={(e) => setGastoMonto(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                  />
+                </div>
+
+                {/* 4. Medio de pago */}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Medio de Pago</label>
                   <select
@@ -802,6 +1229,8 @@ export default function CajaDiariaPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* Acciones */}
                 <div className="flex gap-2">
                   <button
                     onClick={handleAddGasto}
@@ -812,13 +1241,7 @@ export default function CajaDiariaPage() {
                     {savingGasto ? "Guardando..." : "Guardar Gasto"}
                   </button>
                   <button
-                    onClick={() => {
-                      setShowGastoForm(false);
-                      setGastoDesc("");
-                      setGastoMonto("");
-                      setGastoCategoria("otros");
-                      setGastoMedioPago("efectivo");
-                    }}
+                    onClick={resetGastoForm}
                     className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
                   >
                     Cancelar

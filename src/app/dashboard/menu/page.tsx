@@ -44,7 +44,7 @@ export default function MenuPage() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string | number> = { page };
+      const params: Record<string, string | number | boolean> = { page, is_available: true };
       if (search) params.search = search;
       if (selectedCategory) params.category = selectedCategory;
       const { data } = await api.get<PaginatedResponse<MenuItem>>("/menu-items/", { params });

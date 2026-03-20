@@ -230,13 +230,32 @@ export interface ComandaDetalle {
 }
 
 // ── Inventario ──
+export interface CategoriaInsumo {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  area: "cocina" | "barra";
+  total_insumos?: number;
+}
+
+export interface UnidadMedida {
+  id: number;
+  nombre: string;
+  abreviatura: string;
+  tipo: "peso" | "volumen" | "unidad";
+  tipo_display?: string;
+  factor_conversion?: string;
+}
+
 export interface InventarioItem {
   id: number;
   nombre: string;
   categoria_insumo?: number;
   categoria_nombre?: string;
+  categoria_area?: string;
   unidad_medida?: number;
   unidad_abreviatura?: string;
+  unidad?: string;
   stock_actual: string;
   stock_minimo: string;
   costo_unitario: string;
@@ -442,6 +461,11 @@ export interface GastoDiario {
   categoria_display?: string;
   medio_pago: string;
   medio_pago_display?: string;
+  insumo?: number | null;
+  insumo_nombre?: string;
+  unidad_medida?: string;
+  cantidad_insumo?: string | null;
+  costo_unitario_insumo?: string | null;
   created_at: string;
 }
 
