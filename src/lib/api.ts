@@ -51,7 +51,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Silent refresh on 401 — cookies are sent automatically
+// Silent refresh on 401 — uses raw axios to avoid interceptor deadlock
 let isRefreshing = false;
 let refreshSubscribers: ((success: boolean) => void)[] = [];
 
@@ -70,7 +70,8 @@ api.interceptors.response.use(
       if (!isRefreshing) {
         isRefreshing = true;
         try {
-          await api.post("/auth/jwt/refresh/");
+          // Use raw axios (not api) to avoid the response interceptor re-triggering
+          await axios.post(`${API_BASE_URL}/auth/jwt/refresh/`, {}, { withCredentials: true });
           isRefreshing = false;
           onRefreshDone(true);
           return api(originalRequest);
