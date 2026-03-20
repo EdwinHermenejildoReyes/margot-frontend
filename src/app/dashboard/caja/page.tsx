@@ -1026,6 +1026,7 @@ export default function CajaDiariaPage() {
                           <label className="block text-xs text-gray-500 mb-1">Nombre</label>
                           <input
                             type="text"
+                            maxLength={100}
                             value={nuevoInsumoNombre}
                             onChange={(e) => setNuevoInsumoNombre(e.target.value)}
                             placeholder="Ej: Alitas"
