@@ -23,22 +23,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUser = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      if (!token) { setLoading(false); return; }
       const [userRes, sidebarRes] = await Promise.all([
         api.get("/auth/users/me/"),
         api.get("/permisos-sidebar/mis_secciones/"),
       ]);
       setUser(userRes.data);
       setSidebarSections(sidebarRes.data.secciones || []);
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 401 || status === 403) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        setUser(null);
-        setSidebarSections([]);
-      }
+    } catch {
+      setUser(null);
+      setSidebarSections([]);
     } finally {
       setLoading(false);
     }
@@ -47,18 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { fetchUser(); }, []);
 
   const login = async (username: string, password: string) => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    const { data } = await api.post("/auth/jwt/create/", { username, password });
-    localStorage.setItem("access_token", data.access);
-    localStorage.setItem("refresh_token", data.refresh);
+    await api.post("/auth/jwt/create/", { username, password });
     await fetchUser();
     router.push("/dashboard");
   };
 
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+  const logout = async () => {
+    try {
+      await api.post("/auth/jwt/logout/");
+    } catch {
+      // Clear state even if backend call fails
+    }
     setUser(null);
     setSidebarSections([]);
     router.push("/login");

@@ -19,7 +19,14 @@ const API_BASE_URL = getBaseURL();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
 });
+
+function getCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 api.interceptors.request.use((config) => {
   // Asegurar trailing slash para Django APPEND_SLASH
@@ -33,14 +40,25 @@ api.interceptors.request.use((config) => {
   if (!(config.data instanceof FormData)) {
     config.headers["Content-Type"] = config.headers["Content-Type"] || "application/json";
   }
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  // CSRF token for mutating requests
+  const method = config.method?.toUpperCase();
+  if (method && !["GET", "HEAD", "OPTIONS"].includes(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      config.headers["X-CSRFToken"] = csrfToken;
     }
   }
   return config;
 });
+
+// Silent refresh on 401 — cookies are sent automatically
+let isRefreshing = false;
+let refreshSubscribers: ((success: boolean) => void)[] = [];
+
+function onRefreshDone(success: boolean) {
+  refreshSubscribers.forEach((cb) => cb(success));
+  refreshSubscribers = [];
+}
 
 api.interceptors.response.use(
   (response) => response,
@@ -48,20 +66,31 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      try {
-        const refresh = localStorage.getItem("refresh_token");
-        if (refresh) {
-          const { data } = await axios.post(`${API_BASE_URL}/auth/jwt/refresh/`, { refresh });
-          localStorage.setItem("access_token", data.access);
-          if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
-          originalRequest.headers.Authorization = `Bearer ${data.access}`;
+
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          await api.post("/auth/jwt/refresh/");
+          isRefreshing = false;
+          onRefreshDone(true);
           return api(originalRequest);
+        } catch {
+          isRefreshing = false;
+          onRefreshDone(false);
+          return Promise.reject(error);
         }
-      } catch {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        // Don't redirect here — let AuthContext handle navigation
       }
+
+      // Another request already triggered a refresh — wait for it
+      return new Promise((resolve, reject) => {
+        refreshSubscribers.push((success) => {
+          if (success) {
+            resolve(api(originalRequest));
+          } else {
+            reject(error);
+          }
+        });
+      });
     }
     return Promise.reject(error);
   }
