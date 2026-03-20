@@ -452,12 +452,32 @@ export interface ResumenEquipo {
 }
 
 // ── Caja Diaria ──
+export interface CategoriaGasto {
+  id: number;
+  nombre: string;
+  orden: number;
+  activa: boolean;
+}
+
+export interface SocioCatalog {
+  id: number;
+  nombre: string;
+  activo: boolean;
+}
+
+export interface CategoriaInversion {
+  id: number;
+  nombre: string;
+  orden: number;
+  activa: boolean;
+}
+
 export interface GastoDiario {
   id: number;
   cierre_caja: number;
   descripcion: string;
   monto: string;
-  categoria: string;
+  categoria: number;
   categoria_display?: string;
   medio_pago: string;
   medio_pago_display?: string;
@@ -472,11 +492,11 @@ export interface GastoDiario {
 export interface InversionSocio {
   id: number;
   cierre_caja: number;
-  socio: string;
+  socio: number;
   socio_display?: string;
   monto: string;
   descripcion: string;
-  categoria: string;
+  categoria: number;
   categoria_display?: string;
   created_at: string;
 }

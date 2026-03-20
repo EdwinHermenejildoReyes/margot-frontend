@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import type { ResumenDia, GastoDiario, InversionSocio, InventarioItem, CategoriaInsumo, UnidadMedida } from "@/lib/types";
+import type { ResumenDia, GastoDiario, InversionSocio, InventarioItem, CategoriaInsumo, UnidadMedida, CategoriaGasto, SocioCatalog, CategoriaInversion } from "@/lib/types";
 import {
   Landmark,
   DollarSign,
@@ -31,37 +31,9 @@ import {
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
-/* ── Categorías de gasto ── */
-const CATEGORIAS_GASTO = [
-  { value: "insumos", label: "Insumos / Materia Prima" },
-  { value: "servicios", label: "Servicios (luz, agua, gas, internet)" },
-  { value: "personal", label: "Personal / Nómina" },
-  { value: "mantenimiento", label: "Mantenimiento / Reparaciones" },
-  { value: "limpieza", label: "Productos de Limpieza" },
-  { value: "transporte", label: "Transporte / Delivery" },
-  { value: "marketing", label: "Marketing / Publicidad" },
-  { value: "otros", label: "Otros" },
-];
-
 const MEDIOS_PAGO_GASTO = [
   { value: "efectivo", label: "Efectivo" },
   { value: "transferencia", label: "Transferencia" },
-];
-
-const SOCIOS = [
-  { value: "edwin_hermenejildo", label: "Edwin Hermenejildo" },
-  { value: "nadia_banchon", label: "Nadia Banchon" },
-  { value: "enrique_hermenejildo", label: "Enrique Hermenejildo" },
-];
-
-const CATEGORIAS_INVERSION = [
-  { value: "equipamiento", label: "Equipamiento / Mobiliario" },
-  { value: "infraestructura", label: "Infraestructura / Remodelación" },
-  { value: "insumos", label: "Insumos / Materia Prima" },
-  { value: "tecnologia", label: "Tecnología / Software" },
-  { value: "capital", label: "Capital de Trabajo" },
-  { value: "marketing", label: "Marketing / Publicidad" },
-  { value: "otros", label: "Otros" },
 ];
 
 /* ── Estado badge colors ── */
@@ -113,7 +85,7 @@ export default function CajaDiariaPage() {
   /* Gastos */
   const [gastosOpen, setGastosOpen] = useState(false);
   const [showGastoForm, setShowGastoForm] = useState(false);
-  const [gastoCategoria, setGastoCategoria] = useState("otros");
+  const [gastoCategoria, setGastoCategoria] = useState<number>(0);
   const [gastoMedioPago, setGastoMedioPago] = useState("efectivo");
   const [gastoMonto, setGastoMonto] = useState("");
   const [savingGasto, setSavingGasto] = useState(false);
@@ -138,10 +110,10 @@ export default function CajaDiariaPage() {
   /* Inversiones */
   const [inversionesOpen, setInversionesOpen] = useState(false);
   const [showInversionForm, setShowInversionForm] = useState(false);
-  const [inversionSocio, setInversionSocio] = useState("");
+  const [inversionSocio, setInversionSocio] = useState<number>(0);
   const [inversionMonto, setInversionMonto] = useState("");
   const [inversionDesc, setInversionDesc] = useState("");
-  const [inversionCategoria, setInversionCategoria] = useState("otros");
+  const [inversionCategoria, setInversionCategoria] = useState<number>(0);
   const [savingInversion, setSavingInversion] = useState(false);
 
   /* Pedidos expand */
@@ -150,6 +122,11 @@ export default function CajaDiariaPage() {
   /* Cierre de caja */
   const [closingCaja, setClosingCaja] = useState(false);
   const [showConfirmCierre, setShowConfirmCierre] = useState(false);
+
+  /* Catálogos dinámicos */
+  const [categoriasGasto, setCategoriasGasto] = useState<CategoriaGasto[]>([]);
+  const [socios, setSocios] = useState<SocioCatalog[]>([]);
+  const [categoriasInversion, setCategoriasInversion] = useState<CategoriaInversion[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -177,9 +154,35 @@ export default function CajaDiariaPage() {
     fetchData();
   }, [fetchData]);
 
+  /* Cargar catálogos dinámicos */
+  useEffect(() => {
+    Promise.all([
+      api.get("/categorias-gasto/"),
+      api.get("/socios/"),
+      api.get("/categorias-inversion/"),
+    ]).then(([cgRes, sRes, ciRes]) => {
+      const cg: CategoriaGasto[] = cgRes.data;
+      const sc: SocioCatalog[] = sRes.data;
+      const ci: CategoriaInversion[] = ciRes.data;
+      setCategoriasGasto(cg);
+      setSocios(sc);
+      setCategoriasInversion(ci);
+      const otrosGasto = cg.find(c => c.nombre.toLowerCase() === "otros");
+      if (otrosGasto) setGastoCategoria(otrosGasto.id);
+      else if (cg.length > 0) setGastoCategoria(cg[0].id);
+      const otrosInv = ci.find(c => c.nombre.toLowerCase() === "otros");
+      if (otrosInv) setInversionCategoria(otrosInv.id);
+      else if (ci.length > 0) setInversionCategoria(ci[0].id);
+    }).catch(() => {});
+  }, []);
+
+  /* Derivar si la categoría seleccionada es "Insumos" */
+  const selectedGastoCategoria = categoriasGasto.find(c => c.id === gastoCategoria);
+  const isInsumoCategory = selectedGastoCategoria?.nombre?.toLowerCase().startsWith("insumo") ?? false;
+
   /* Cargar insumos, categorías y unidades cuando se elige "insumos" */
   useEffect(() => {
-    if (gastoCategoria === "insumos") {
+    if (isInsumoCategory) {
       api.get(`/inventario/?is_active=true&ordering=nombre&page_size=200`)
         .then((res) => setInsumos(res.data?.results ?? res.data ?? []))
         .catch(() => setInsumos([]));
@@ -190,7 +193,7 @@ export default function CajaDiariaPage() {
         .then((res) => setUnidadesMedida(res.data?.results ?? res.data ?? []))
         .catch(() => setUnidadesMedida([]));
     }
-  }, [gastoCategoria]);
+  }, [isInsumoCategory]);
 
   /* Insumos filtrados por área seleccionada */
   const insumosFiltrados = insumos.filter(
@@ -301,7 +304,7 @@ export default function CajaDiariaPage() {
     }
 
     // Si es insumo, validar que haya insumo seleccionado y datos de compra
-    if (gastoCategoria === "insumos" && gastoInsumo) {
+    if (isInsumoCategory && gastoInsumo) {
       if (!gastoUnidades || Number(gastoUnidades) <= 0) {
         toast.error("Ingrese la cantidad de unidades compradas");
         return;
@@ -313,9 +316,9 @@ export default function CajaDiariaPage() {
     }
 
     // Auto-generar descripción
-    const catLabel = CATEGORIAS_GASTO.find((c) => c.value === gastoCategoria)?.label ?? gastoCategoria;
+    const catLabel = selectedGastoCategoria?.nombre ?? "";
     let descripcion = catLabel;
-    if (gastoCategoria === "insumos" && selectedInsumo) {
+    if (isInsumoCategory && selectedInsumo) {
       if (isUnitBased) {
         descripcion = `${selectedInsumo.nombre} — ${unidades} cajas × ${pesoUnidad} und = ${cantidadEnBase} und`;
       } else {
@@ -333,7 +336,7 @@ export default function CajaDiariaPage() {
         categoria: gastoCategoria,
         medio_pago: gastoMedioPago,
       };
-      if (gastoCategoria === "insumos" && gastoInsumo && cantidadEnBase > 0) {
+      if (isInsumoCategory && gastoInsumo && cantidadEnBase > 0) {
         payload.insumo = Number(gastoInsumo);
         payload.cantidad_insumo = cantidadEnBase.toFixed(3);
         // Costo unitario por unidad base = monto total / cantidad en base
@@ -342,7 +345,7 @@ export default function CajaDiariaPage() {
       }
       await api.post("/gastos-diarios/", payload);
       toast.success(
-        gastoCategoria === "insumos" && gastoInsumo
+        isInsumoCategory && gastoInsumo
           ? "Gasto registrado e inventario actualizado"
           : "Gasto registrado"
       );
@@ -356,7 +359,8 @@ export default function CajaDiariaPage() {
   };
 
   const resetGastoForm = () => {
-    setGastoCategoria("otros");
+    const otrosGasto = categoriasGasto.find(c => c.nombre.toLowerCase() === "otros");
+    setGastoCategoria(otrosGasto?.id ?? 0);
     setGastoMedioPago("efectivo");
     setGastoMonto("");
     setGastoArea("cocina");
@@ -450,10 +454,11 @@ export default function CajaDiariaPage() {
         categoria: inversionCategoria,
       });
       toast.success("Inversión registrada");
-      setInversionSocio("");
+      setInversionSocio(0);
       setInversionMonto("");
       setInversionDesc("");
-      setInversionCategoria("otros");
+      const otrosInv = categoriasInversion.find(c => c.nombre.toLowerCase() === "otros");
+      setInversionCategoria(otrosInv?.id ?? 0);
       setShowInversionForm(false);
       fetchData();
     } catch {
@@ -937,21 +942,21 @@ export default function CajaDiariaPage() {
                   <select
                     value={gastoCategoria}
                     onChange={(e) => {
-                      setGastoCategoria(e.target.value);
+                      setGastoCategoria(Number(e.target.value));
                       setGastoInsumo("");
                       setGastoUnidades("");
                       setGastoPesoUnidad("");
                     }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
                   >
-                    {CATEGORIAS_GASTO.map((c) => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
+                    {categoriasGasto.filter(c => c.activa).map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
                 </div>
 
                 {/* 2. Si es Insumos: Área + Insumo + Detalles de compra */}
-                {gastoCategoria === "insumos" && (
+                {isInsumoCategory && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
                     <p className="text-xs font-semibold text-blue-700 flex items-center gap-1">
                       <ShoppingCart className="h-3.5 w-3.5" />
@@ -1339,12 +1344,12 @@ export default function CajaDiariaPage() {
                       <label className="block text-xs text-gray-500 mb-1">Socio</label>
                       <select
                         value={inversionSocio}
-                        onChange={(e) => setInversionSocio(e.target.value)}
+                        onChange={(e) => setInversionSocio(Number(e.target.value))}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                       >
-                        <option value="">Seleccionar socio...</option>
-                        {SOCIOS.map((s) => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
+                        <option value={0}>Seleccionar socio...</option>
+                        {socios.filter(s => s.activo).map((s) => (
+                          <option key={s.id} value={s.id}>{s.nombre}</option>
                         ))}
                       </select>
                     </div>
@@ -1364,11 +1369,11 @@ export default function CajaDiariaPage() {
                       <label className="block text-xs text-gray-500 mb-1">Categoría</label>
                       <select
                         value={inversionCategoria}
-                        onChange={(e) => setInversionCategoria(e.target.value)}
+                        onChange={(e) => setInversionCategoria(Number(e.target.value))}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                       >
-                        {CATEGORIAS_INVERSION.map((c) => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
+                        {categoriasInversion.filter(c => c.activa).map((c) => (
+                          <option key={c.id} value={c.id}>{c.nombre}</option>
                         ))}
                       </select>
                     </div>
@@ -1395,10 +1400,11 @@ export default function CajaDiariaPage() {
                     <button
                       onClick={() => {
                         setShowInversionForm(false);
-                        setInversionSocio("");
+                        setInversionSocio(0);
                         setInversionMonto("");
                         setInversionDesc("");
-                        setInversionCategoria("otros");
+                        const otrosInv = categoriasInversion.find(c => c.nombre.toLowerCase() === "otros");
+                        setInversionCategoria(otrosInv?.id ?? 0);
                       }}
                       className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
                     >
