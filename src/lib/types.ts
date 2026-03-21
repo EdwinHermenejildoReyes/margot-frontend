@@ -95,6 +95,7 @@ export interface PedidoDetalle {
   precio_unitario: string;
   subtotal: string;
   notas?: string;
+  salsas_seleccionadas?: string[];
 }
 
 export interface PromocionItem {
