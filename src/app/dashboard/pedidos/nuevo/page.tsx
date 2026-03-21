@@ -37,6 +37,16 @@ interface CartItem {
   menuItem: MenuItem;
   cantidad: number;
   notas: string;
+  salsas_seleccionadas?: string[];
+}
+
+/* ── Alitas sauce config ── */
+const SALSAS_DISPONIBLES = ["BBQ", "Maracuyá", "Cheddar", "Honey Mustard"];
+
+function getMaxSalsas(item: MenuItem): number {
+  if (item.category_name?.toLowerCase() !== "alitas") return 0;
+  const match = item.name.match(/^(\d+)/);
+  return match ? Math.floor(parseInt(match[1]) / 5) : 0;
 }
 
 interface CartPromo {
@@ -226,7 +236,7 @@ export default function NuevoPedidoPage() {
           c.menuItem.id === item.id ? { ...c, cantidad: c.cantidad + 1 } : c
         );
       }
-      return [...prev, { menuItem: item, cantidad: 1, notas: "" }];
+      return [...prev, { menuItem: item, cantidad: 1, notas: "", salsas_seleccionadas: [] }];
     });
   };
 
@@ -247,6 +257,21 @@ export default function NuevoPedidoPage() {
   const updateItemNotes = (itemId: number, notas: string) => {
     setCart((prev) =>
       prev.map((c) => (c.menuItem.id === itemId ? { ...c, notas } : c))
+    );
+  };
+
+  const toggleSalsa = (itemId: number, salsa: string) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.menuItem.id !== itemId) return c;
+        const max = getMaxSalsas(c.menuItem);
+        const current = c.salsas_seleccionadas || [];
+        if (current.includes(salsa)) {
+          return { ...c, salsas_seleccionadas: current.filter((s) => s !== salsa) };
+        }
+        if (current.length >= max) return c;
+        return { ...c, salsas_seleccionadas: [...current, salsa] };
+      })
     );
   };
 
@@ -451,6 +476,15 @@ export default function NuevoPedidoPage() {
       return;
     }
 
+    // Validate salsas for alitas
+    for (const c of cart) {
+      const max = getMaxSalsas(c.menuItem);
+      if (max > 0 && (!c.salsas_seleccionadas || c.salsas_seleccionadas.length !== max)) {
+        toast.error(`Selecciona ${max} salsa(s) para ${c.menuItem.name}`);
+        return;
+      }
+    }
+
     if (tipoEntrega === "local" && !mesaId) {
       toast.error("Selecciona una mesa para consumo en local");
       return;
@@ -481,6 +515,9 @@ export default function NuevoPedidoPage() {
           menu_item: c.menuItem.id,
           cantidad: c.cantidad,
           notas: c.notas || undefined,
+          ...(c.salsas_seleccionadas && c.salsas_seleccionadas.length > 0
+            ? { salsas_seleccionadas: c.salsas_seleccionadas }
+            : {}),
         })),
         promociones: cartPromos.map((cp) => ({
           promocion: cp.promocion.id,
@@ -993,6 +1030,46 @@ export default function NuevoPedidoPage() {
                       <StickyNote className="h-3 w-3" />
                       {item.notas || "Agregar nota"}
                     </button>
+                  )}
+
+                  {/* Sauce selector for Alitas */}
+                  {getMaxSalsas(item.menuItem) > 0 && (
+                    <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-xs font-medium text-amber-800 mb-1.5">
+                        🍗 Elige {getMaxSalsas(item.menuItem)} salsa{getMaxSalsas(item.menuItem) > 1 ? "s" : ""}:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SALSAS_DISPONIBLES.map((salsa) => {
+                          const selected = item.salsas_seleccionadas?.includes(salsa);
+                          const maxReached =
+                            !selected &&
+                            (item.salsas_seleccionadas?.length || 0) >= getMaxSalsas(item.menuItem);
+                          return (
+                            <button
+                              key={salsa}
+                              type="button"
+                              onClick={() => toggleSalsa(item.menuItem.id, salsa)}
+                              disabled={maxReached}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-full text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-amber-500 text-white shadow-sm"
+                                  : maxReached
+                                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                                    : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"
+                              )}
+                            >
+                              {salsa}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {(item.salsas_seleccionadas?.length || 0) < getMaxSalsas(item.menuItem) && (
+                        <p className="text-[10px] text-amber-600 mt-1">
+                          Faltan {getMaxSalsas(item.menuItem) - (item.salsas_seleccionadas?.length || 0)} por elegir
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

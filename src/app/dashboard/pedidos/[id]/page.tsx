@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { MenuItem, Category, PaginatedResponse, Promocion } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
+import clsx from "clsx";
 import {
   ArrowLeft,
   Clock,
@@ -35,10 +36,12 @@ interface DetallePedido {
   menu_item: number;
   menu_item_nombre?: string;
   menu_item_name?: string;
+  menu_item_category_name?: string;
   cantidad: number;
   precio_unitario: string;
   subtotal: string;
   notas?: string;
+  salsas_seleccionadas?: string[];
 }
 
 interface PromocionPedido {
@@ -85,6 +88,17 @@ interface EditItem {
   price: number;
   cantidad: number;
   notas: string;
+  salsas_seleccionadas?: string[];
+  category_name?: string;
+}
+
+/* ── Alitas sauce config ── */
+const SALSAS_DISPONIBLES = ["BBQ", "Maracuyá", "Cheddar", "Honey Mustard"];
+
+function getMaxSalsasFromName(name: string, categoryName?: string): number {
+  if (categoryName?.toLowerCase() !== "alitas") return 0;
+  const match = name.match(/^(\d+)/);
+  return match ? Math.floor(parseInt(match[1]) / 5) : 0;
 }
 
 interface EditPromo {
@@ -111,6 +125,12 @@ export default function PedidoDetailPage() {
   const [editPromos, setEditPromos] = useState<EditPromo[]>([]);
   const [editNotas, setEditNotas] = useState("");
   const [saving, setSaving] = useState(false);
+
+  /* add-items mode (for orders in preparation / confirmado / listo) */
+  const [addingItems, setAddingItems] = useState(false);
+  const [newItems, setNewItems] = useState<EditItem[]>([]);
+  const [newPromos, setNewPromos] = useState<EditPromo[]>([]);
+  const [savingNew, setSavingNew] = useState(false);
 
   /* add-item modal */
   const [showAddModal, setShowAddModal] = useState(false);
@@ -144,11 +164,11 @@ export default function PedidoDetailPage() {
 
   // Auto-refresh every 10s to reflect state changes from other users
   useEffect(() => {
-    if (editing) return; // Don't refresh while editing
+    if (editing || addingItems) return; // Don't refresh while editing/adding
     const interval = setInterval(fetchPedido, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, editing]);
+  }, [params.id, editing, addingItems]);
 
   /* ── Actions ── */
   const handleAction = async (action: string) => {
@@ -180,6 +200,8 @@ export default function PedidoDetailPage() {
         price: parseFloat(d.precio_unitario),
         cantidad: d.cantidad,
         notas: d.notas || "",
+        salsas_seleccionadas: d.salsas_seleccionadas || [],
+        category_name: d.menu_item_category_name,
       }))
     );
     setEditPromos(
@@ -203,6 +225,156 @@ export default function PedidoDetailPage() {
     setShowAddModal(false);
   };
 
+  /* ── Add-items mode helpers ── */
+  const startAddingItems = () => {
+    setNewItems([]);
+    setNewPromos([]);
+    setAddingItems(true);
+  };
+
+  const cancelAddingItems = () => {
+    setAddingItems(false);
+    setNewItems([]);
+    setNewPromos([]);
+    setShowAddModal(false);
+  };
+
+  const addNewItemFromMenu = (menuItem: MenuItem) => {
+    setNewItems((prev) => {
+      const existing = prev.findIndex((e) => e.menu_item_id === menuItem.id);
+      if (existing >= 0) {
+        return prev.map((item, i) =>
+          i === existing ? { ...item, cantidad: item.cantidad + 1 } : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          menu_item_id: menuItem.id,
+          name: menuItem.name,
+          price: parseFloat(menuItem.price),
+          cantidad: 1,
+          notas: "",
+          salsas_seleccionadas: [],
+          category_name: menuItem.category_name,
+        },
+      ];
+    });
+    toast.success(`${menuItem.name} agregado`);
+  };
+
+  const addNewPromoFromList = (promo: Promocion) => {
+    const precio = promo.tipo === "adicional"
+      ? parseFloat(promo.precio_extra || "0")
+      : parseFloat(promo.precio_promocional || "0");
+    setNewPromos((prev) => {
+      const existing = prev.findIndex((e) => e.promocion_id === promo.id);
+      if (existing >= 0) {
+        return prev.map((item, i) =>
+          i === existing ? { ...item, cantidad: item.cantidad + 1 } : item
+        );
+      }
+      return [...prev, { promocion_id: promo.id, nombre: promo.nombre, precio, cantidad: 1 }];
+    });
+    toast.success(`${promo.nombre} agregado`);
+  };
+
+  const updateNewQty = (idx: number, delta: number) => {
+    setNewItems((prev) =>
+      prev
+        .map((item, i) =>
+          i === idx ? { ...item, cantidad: Math.max(0, item.cantidad + delta) } : item
+        )
+        .filter((item) => item.cantidad > 0)
+    );
+  };
+
+  const removeNewItem = (idx: number) => {
+    setNewItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateNewItemNotes = (idx: number, notas: string) => {
+    setNewItems((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, notas } : item))
+    );
+  };
+
+  const toggleNewSalsa = (idx: number, salsa: string) => {
+    setNewItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const max = getMaxSalsasFromName(item.name, item.category_name);
+        const current = item.salsas_seleccionadas || [];
+        if (current.includes(salsa)) {
+          return { ...item, salsas_seleccionadas: current.filter((s) => s !== salsa) };
+        }
+        if (current.length >= max) return item;
+        return { ...item, salsas_seleccionadas: [...current, salsa] };
+      })
+    );
+  };
+
+  const updateNewPromoQty = (idx: number, delta: number) => {
+    setNewPromos((prev) =>
+      prev
+        .map((item, i) =>
+          i === idx ? { ...item, cantidad: Math.max(0, item.cantidad + delta) } : item
+        )
+        .filter((item) => item.cantidad > 0)
+    );
+  };
+
+  const removeNewPromo = (idx: number) => {
+    setNewPromos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const newItemsTotal = useMemo(
+    () =>
+      newItems.reduce((sum, item) => sum + item.price * item.cantidad, 0) +
+      newPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0),
+    [newItems, newPromos]
+  );
+
+  const saveNewItems = async () => {
+    if (newItems.length === 0 && newPromos.length === 0) {
+      toast.error("Debes agregar al menos un ítem o promoción");
+      return;
+    }
+    setSavingNew(true);
+    try {
+      const { data } = await api.post(`/pedidos/${params.id}/agregar_items/`, {
+        detalles: newItems.map((item) => ({
+          menu_item: item.menu_item_id,
+          cantidad: item.cantidad,
+          notas: item.notas || "",
+          ...(item.salsas_seleccionadas && item.salsas_seleccionadas.length > 0
+            ? { salsas_seleccionadas: item.salsas_seleccionadas }
+            : {}),
+        })),
+        promociones: newPromos.map((p) => ({
+          promocion: p.promocion_id,
+          cantidad: p.cantidad,
+          ...(p.menu_item_seleccionado ? { menu_item_seleccionado: p.menu_item_seleccionado } : {}),
+        })),
+      });
+      setPedido(data);
+      setAddingItems(false);
+      setNewItems([]);
+      setNewPromos([]);
+      toast.success("Ítems agregados — nueva comanda enviada a cocina ⚡");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: StockErrorResponse & { error?: string } } };
+      if (axiosErr.response?.status === 409 && axiosErr.response.data?.error === "stock_insuficiente") {
+        setStockError(axiosErr.response.data as StockErrorResponse);
+        setStockAction("confirmar");
+      } else {
+        toast.error(axiosErr.response?.data?.error as string || "Error al agregar ítems");
+      }
+    } finally {
+      setSavingNew(false);
+    }
+  };
+
   const updateQty = (idx: number, delta: number) => {
     setEditItems((prev) =>
       prev
@@ -223,6 +395,21 @@ export default function PedidoDetailPage() {
     );
   };
 
+  const toggleEditSalsa = (idx: number, salsa: string) => {
+    setEditItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const max = getMaxSalsasFromName(item.name, item.category_name);
+        const current = item.salsas_seleccionadas || [];
+        if (current.includes(salsa)) {
+          return { ...item, salsas_seleccionadas: current.filter((s) => s !== salsa) };
+        }
+        if (current.length >= max) return item;
+        return { ...item, salsas_seleccionadas: [...current, salsa] };
+      })
+    );
+  };
+
   const addItemFromMenu = (menuItem: MenuItem) => {
     setEditItems((prev) => {
       const existing = prev.findIndex((e) => e.menu_item_id === menuItem.id);
@@ -239,6 +426,8 @@ export default function PedidoDetailPage() {
           price: parseFloat(menuItem.price),
           cantidad: 1,
           notas: "",
+          salsas_seleccionadas: [],
+          category_name: menuItem.category_name,
         },
       ];
     });
@@ -296,6 +485,9 @@ export default function PedidoDetailPage() {
           menu_item: item.menu_item_id,
           cantidad: item.cantidad,
           notas: item.notas || "",
+          ...(item.salsas_seleccionadas && item.salsas_seleccionadas.length > 0
+            ? { salsas_seleccionadas: item.salsas_seleccionadas }
+            : {}),
         })),
         promociones: editPromos.map((p) => ({
           promocion: p.promocion_id,
@@ -381,14 +573,24 @@ export default function PedidoDetailPage() {
 
         {/* Action buttons */}
         <div className="flex gap-2 flex-wrap">
-          {/* Edit button (only pendiente & not already editing) */}
-          {isPendiente && !editing && (
+          {/* Edit button (only pendiente & not already editing/adding) */}
+          {isPendiente && !editing && !addingItems && (
             <button
               onClick={startEditing}
               className="px-4 py-2 rounded-lg bg-brand-gold text-white text-sm font-medium hover:bg-brand-bronze transition-colors flex items-center gap-2"
             >
               <Pencil className="h-4 w-4" />
               Editar
+            </button>
+          )}
+          {/* Add-items button (confirmado / en_preparacion / listo) */}
+          {["confirmado", "en_preparacion", "listo"].includes(pedido.estado) && !editing && !addingItems && (
+            <button
+              onClick={startAddingItems}
+              className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar Ítems
             </button>
           )}
           {/* Save / cancel while editing */}
@@ -411,8 +613,28 @@ export default function PedidoDetailPage() {
               </button>
             </>
           )}
+          {/* Save / cancel while adding items */}
+          {addingItems && (
+            <>
+              <button
+                onClick={cancelAddingItems}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancelar
+              </button>
+              <button
+                onClick={saveNewItems}
+                disabled={savingNew || (newItems.length === 0 && newPromos.length === 0)}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {savingNew ? "Enviando..." : "Enviar a Cocina"}
+              </button>
+            </>
+          )}
           {/* ── Role-based workflow actions ── */}
-          {!editing && (() => {
+          {!editing && !addingItems && (() => {
             const tipo = user?.tipo_usuario;
             const isAdmin = user?.is_staff || tipo === "comercio";
             const isMeseroCajero = tipo === "mesero" || tipo === "cajero";
@@ -488,7 +710,7 @@ export default function PedidoDetailPage() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Ítems del Pedido</h2>
-            {editing && (
+            {(editing || addingItems) && (
               <button
                 onClick={openAddModal}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-sage text-brand-dark text-xs font-medium hover:bg-brand-sage-dark transition-colors"
@@ -500,7 +722,7 @@ export default function PedidoDetailPage() {
           </div>
 
           {/* ── View mode ── */}
-          {!editing && (
+          {!editing && !addingItems && (
             <div className="divide-y divide-gray-100">
               {pedido.detalles?.map((det) => (
                 <div key={det.id} className="px-6 py-4 flex items-center justify-between">
@@ -511,6 +733,9 @@ export default function PedidoDetailPage() {
                     <p className="text-xs text-gray-400">
                       Cantidad: {det.cantidad} × ${det.precio_unitario}
                     </p>
+                    {det.salsas_seleccionadas && det.salsas_seleccionadas.length > 0 && (
+                      <p className="text-xs text-amber-600 mt-1">🍗 Salsas: {det.salsas_seleccionadas.join(", ")}</p>
+                    )}
                     {det.notas && (
                       <p className="text-xs text-gray-400 italic mt-1">📝 {det.notas}</p>
                     )}
@@ -619,6 +844,46 @@ export default function PedidoDetailPage() {
                       {item.notas || "Agregar nota"}
                     </button>
                   )}
+
+                  {/* Sauce selector for Alitas in edit mode */}
+                  {getMaxSalsasFromName(item.name, item.category_name) > 0 && (
+                    <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-xs font-medium text-amber-800 mb-1.5">
+                        🍗 Elige {getMaxSalsasFromName(item.name, item.category_name)} salsa{getMaxSalsasFromName(item.name, item.category_name) > 1 ? "s" : ""}:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SALSAS_DISPONIBLES.map((salsa) => {
+                          const selected = item.salsas_seleccionadas?.includes(salsa);
+                          const maxReached =
+                            !selected &&
+                            (item.salsas_seleccionadas?.length || 0) >= getMaxSalsasFromName(item.name, item.category_name);
+                          return (
+                            <button
+                              key={salsa}
+                              type="button"
+                              onClick={() => toggleEditSalsa(idx, salsa)}
+                              disabled={maxReached}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-full text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-amber-500 text-white shadow-sm"
+                                  : maxReached
+                                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                                    : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"
+                              )}
+                            >
+                              {salsa}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {(item.salsas_seleccionadas?.length || 0) < getMaxSalsasFromName(item.name, item.category_name) && (
+                        <p className="text-[10px] text-amber-600 mt-1">
+                          Faltan {getMaxSalsasFromName(item.name, item.category_name) - (item.salsas_seleccionadas?.length || 0)} por elegir
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -672,6 +937,209 @@ export default function PedidoDetailPage() {
               {editItems.length === 0 && editPromos.length === 0 && (
                 <div className="px-6 py-8 text-center text-sm text-gray-400">
                   Sin ítems. Agrega al menos uno para guardar.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Adding-items mode: existing items (read-only) + new items ── */}
+          {addingItems && (
+            <div className="divide-y divide-gray-100">
+              {/* Existing items — read-only */}
+              {pedido.detalles?.map((det) => (
+                <div key={det.id} className="px-6 py-4 flex items-center justify-between opacity-60">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {det.menu_item_nombre || det.menu_item_name || `Ítem #${det.menu_item}`}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Cantidad: {det.cantidad} × ${det.precio_unitario}
+                    </p>
+                    {det.salsas_seleccionadas && det.salsas_seleccionadas.length > 0 && (
+                      <p className="text-xs text-amber-600 mt-1">🍗 Salsas: {det.salsas_seleccionadas.join(", ")}</p>
+                    )}
+                    {det.notas && (
+                      <p className="text-xs text-gray-400 italic mt-1">📝 {det.notas}</p>
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">${det.subtotal}</span>
+                </div>
+              ))}
+              {pedido.promociones && pedido.promociones.length > 0 &&
+                pedido.promociones.map((pp) => (
+                  <div key={`promo-${pp.id}`} className="px-6 py-4 flex items-center justify-between opacity-60">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{pp.promocion_nombre}</p>
+                      <p className="text-xs text-purple-500">{pp.promocion_tipo_display} · ×{pp.cantidad}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">${pp.subtotal}</span>
+                  </div>
+                ))}
+
+              {/* Divider — new items section */}
+              <div className="px-6 py-2 bg-emerald-50 flex items-center gap-2">
+                <Plus className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="text-xs font-semibold text-emerald-700 uppercase">Nuevos ítems (adición)</span>
+              </div>
+
+              {newItems.length === 0 && newPromos.length === 0 && (
+                <div className="px-6 py-8 text-center text-sm text-gray-400">
+                  Usa el botón &quot;Agregar Ítem&quot; para añadir productos.
+                </div>
+              )}
+
+              {newItems.map((item, idx) => (
+                <div key={`new-${item.menu_item_id}-${idx}`} className="px-6 py-4 bg-emerald-50/30">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                      <p className="text-xs text-gray-400">${item.price.toFixed(2)} c/u</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => updateNewQty(idx, -1)}
+                        className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="text-sm font-semibold w-8 text-center">{item.cantidad}</span>
+                      <button
+                        onClick={() => updateNewQty(idx, 1)}
+                        className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900 w-20 text-right">
+                      ${(item.price * item.cantidad).toFixed(2)}
+                    </p>
+                    <button
+                      onClick={() => removeNewItem(idx)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Per-item notes */}
+                  {notesOpenFor === 1000 + idx ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={item.notas}
+                        onChange={(e) => updateNewItemNotes(idx, e.target.value)}
+                        placeholder="Ej: sin cebolla, extra queso..."
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:ring-1 focus:ring-brand-gold focus:outline-none"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => setNotesOpenFor(null)}
+                        className="p-1 rounded hover:bg-gray-100"
+                      >
+                        <X className="h-3.5 w-3.5 text-gray-400" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setNotesOpenFor(1000 + idx)}
+                      className="mt-1 flex items-center gap-1 text-xs text-gray-400 hover:text-brand-gold transition-colors"
+                    >
+                      <StickyNote className="h-3 w-3" />
+                      {item.notas || "Agregar nota"}
+                    </button>
+                  )}
+
+                  {/* Sauce selector for Alitas */}
+                  {getMaxSalsasFromName(item.name, item.category_name) > 0 && (
+                    <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-xs font-medium text-amber-800 mb-1.5">
+                        🍗 Elige {getMaxSalsasFromName(item.name, item.category_name)} salsa{getMaxSalsasFromName(item.name, item.category_name) > 1 ? "s" : ""}:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SALSAS_DISPONIBLES.map((salsa) => {
+                          const selected = item.salsas_seleccionadas?.includes(salsa);
+                          const maxReached =
+                            !selected &&
+                            (item.salsas_seleccionadas?.length || 0) >= getMaxSalsasFromName(item.name, item.category_name);
+                          return (
+                            <button
+                              key={salsa}
+                              type="button"
+                              onClick={() => toggleNewSalsa(idx, salsa)}
+                              disabled={maxReached}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-full text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-amber-500 text-white shadow-sm"
+                                  : maxReached
+                                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                                    : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"
+                              )}
+                            >
+                              {salsa}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {(item.salsas_seleccionadas?.length || 0) < getMaxSalsasFromName(item.name, item.category_name) && (
+                        <p className="text-[10px] text-amber-600 mt-1">
+                          Faltan {getMaxSalsasFromName(item.name, item.category_name) - (item.salsas_seleccionadas?.length || 0)} por elegir
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* New promotions */}
+              {newPromos.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-purple-50 flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="text-xs font-semibold text-purple-700 uppercase">Nuevas Promociones</span>
+                  </div>
+                  {newPromos.map((p, idx) => (
+                    <div key={`new-promo-${p.promocion_id}-${idx}`} className="px-6 py-4 bg-emerald-50/30">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{p.nombre}</p>
+                          <p className="text-xs text-purple-500">${p.precio.toFixed(2)} c/u</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => updateNewPromoQty(idx, -1)}
+                            className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="text-sm font-semibold w-8 text-center">{p.cantidad}</span>
+                          <button
+                            onClick={() => updateNewPromoQty(idx, 1)}
+                            className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900 w-20 text-right">
+                          ${(p.precio * p.cantidad).toFixed(2)}
+                        </p>
+                        <button
+                          onClick={() => removeNewPromo(idx)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* New items total */}
+              {(newItems.length > 0 || newPromos.length > 0) && (
+                <div className="px-6 py-3 bg-emerald-50 flex justify-between items-center">
+                  <span className="text-xs font-semibold text-emerald-700">Subtotal adición</span>
+                  <span className="text-sm font-bold text-emerald-700">${newItemsTotal.toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -873,16 +1341,17 @@ export default function PedidoDetailPage() {
                       )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {filteredModalPromos.map((promo) => {
-                          const inEdit = editPromos.find((e) => e.promocion_id === promo.id);
+                          const activePromos = addingItems ? newPromos : editPromos;
+                          const inList = activePromos.find((e) => e.promocion_id === promo.id);
                           const precio = promo.tipo === "adicional"
                             ? parseFloat(promo.precio_extra || "0")
                             : parseFloat(promo.precio_promocional || "0");
                           return (
                             <button
                               key={`promo-${promo.id}`}
-                              onClick={() => addPromoFromList(promo)}
+                              onClick={() => addingItems ? addNewPromoFromList(promo) : addPromoFromList(promo)}
                               className={
-                                inEdit
+                                inList
                                   ? "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-purple-500 bg-purple-50"
                                   : "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-gray-200 bg-white hover:border-purple-300"
                               }
@@ -896,8 +1365,8 @@ export default function PedidoDetailPage() {
                               </div>
                               <div className="text-right flex-shrink-0">
                                 <p className="text-sm font-bold text-purple-600">${precio.toFixed(2)}</p>
-                                {inEdit && (
-                                  <span className="text-xs text-purple-500">×{inEdit.cantidad}</span>
+                                {inList && (
+                                  <span className="text-xs text-purple-500">×{inList.cantidad}</span>
                                 )}
                               </div>
                             </button>
@@ -919,13 +1388,14 @@ export default function PedidoDetailPage() {
                       )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {filteredMenu.map((mi) => {
-                          const inEdit = editItems.find((e) => e.menu_item_id === mi.id);
+                          const activeItems = addingItems ? newItems : editItems;
+                          const inList = activeItems.find((e) => e.menu_item_id === mi.id);
                           return (
                             <button
                               key={mi.id}
-                              onClick={() => addItemFromMenu(mi)}
+                              onClick={() => addingItems ? addNewItemFromMenu(mi) : addItemFromMenu(mi)}
                               className={
-                                inEdit
+                                inList
                                   ? "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-brand-gold bg-brand-sage/30"
                                   : "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all hover:shadow-sm border-gray-200 bg-white hover:border-brand-gold/50"
                               }
@@ -939,8 +1409,8 @@ export default function PedidoDetailPage() {
                               </div>
                               <div className="text-right flex-shrink-0">
                                 <p className="text-sm font-bold text-brand-gold">${mi.price}</p>
-                                {inEdit && (
-                                  <span className="text-xs text-brand-bronze">×{inEdit.cantidad}</span>
+                                {inList && (
+                                  <span className="text-xs text-brand-bronze">×{inList.cantidad}</span>
                                 )}
                               </div>
                             </button>
@@ -956,15 +1426,15 @@ export default function PedidoDetailPage() {
             {/* Footer */}
             <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex items-center justify-between">
               <p className="text-sm text-gray-500">
-                {editItems.length + editPromos.length} ítem{editItems.length + editPromos.length !== 1 ? "s" : ""} ·
+                {(addingItems ? newItems.length + newPromos.length : editItems.length + editPromos.length)} ítem{(addingItems ? newItems.length + newPromos.length : editItems.length + editPromos.length) !== 1 ? "s" : ""} ·
                 Total:{" "}
-                <span className="font-semibold text-brand-gold">
-                  ${editTotal.toFixed(2)}
+                <span className={`font-semibold ${addingItems ? 'text-emerald-600' : 'text-brand-gold'}`}>
+                  ${(addingItems ? newItemsTotal : editTotal).toFixed(2)}
                 </span>
               </p>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 rounded-lg bg-brand-gold text-white text-sm font-medium hover:bg-brand-bronze transition-colors"
+                className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${addingItems ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-brand-gold hover:bg-brand-bronze'}`}
               >
                 Listo
               </button>

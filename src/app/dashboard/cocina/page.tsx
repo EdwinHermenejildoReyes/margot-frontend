@@ -44,10 +44,15 @@ export default function CocinaPage() {
       const filtered = list.map((p) => ({
         ...p,
         detalles: p.detalles?.filter(
-          (d) => !d.section_name || d.section_name === "Cocina"
+          (d) => !d.section_name || d.section_name.toUpperCase() === "COCINA"
         ),
         promociones: p.promociones?.filter(
-          (pp) => !pp.menu_item_seleccionado_section || pp.menu_item_seleccionado_section === "Cocina"
+          (pp) => {
+            if (pp.secciones_items && pp.secciones_items.length > 0) {
+              return pp.secciones_items.some((s) => s.toUpperCase() === "COCINA");
+            }
+            return !pp.menu_item_seleccionado_section || pp.menu_item_seleccionado_section.toUpperCase() === "COCINA";
+          }
         ),
       })).filter(
         (p) => (p.detalles?.length || 0) + (p.promociones?.length || 0) > 0
@@ -271,24 +276,34 @@ function PedidoCard({
               {det.notas && (
                 <p className="text-xs text-yellow-700 mt-0.5">📝 {det.notas}</p>
               )}
+              {det.salsas_seleccionadas && det.salsas_seleccionadas.length > 0 && (
+                <p className="text-xs text-amber-700 mt-0.5">🍗 Salsas: {det.salsas_seleccionadas.join(", ")}</p>
+              )}
             </div>
           </div>
         ))}
-        {pedido.promociones?.map((pp) => (
-          <div key={`promo-${pp.id}`} className="flex items-start gap-2">
-            <span className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-              {pp.cantidad}
-            </span>
-            <div>
-              <span className="text-sm font-medium text-gray-900">
-                {pp.menu_item_seleccionado_nombre || pp.promocion_nombre}
+        {pedido.promociones?.map((pp) => {
+          const items = pp.items_detalle?.filter(
+            (it) => !it.section_name || it.section_name.toUpperCase() === "COCINA"
+          ) || [];
+          if (items.length === 0) return null;
+          const nombres = items.map((it) => it.nombre).join(", ");
+          return (
+            <div key={`promo-${pp.id}`} className="flex items-start gap-2">
+              <span className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                {pp.cantidad}
               </span>
-              <span className="ml-1.5 text-xs text-amber-600 font-medium">
-                ★ {pp.promocion_nombre}
-              </span>
+              <div>
+                <span className="text-sm font-medium text-gray-900">
+                  {nombres}
+                </span>
+                <span className="ml-1.5 text-xs text-amber-600 font-medium">
+                  ★ {pp.promocion_nombre}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {pedido.notas && (
           <div className="mt-2 p-2 rounded-lg bg-yellow-100 text-yellow-800 text-xs">
             📝 {pedido.notas}

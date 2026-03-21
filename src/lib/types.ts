@@ -134,6 +134,8 @@ export interface PedidoPromocion {
   menu_item_seleccionado?: number;
   menu_item_seleccionado_nombre?: string;
   menu_item_seleccionado_section?: string;
+  secciones_items?: string[];
+  items_detalle?: { nombre: string; section_name: string | null; cantidad: number }[];
   cantidad: number;
   precio_unitario: string;
   subtotal: string;
