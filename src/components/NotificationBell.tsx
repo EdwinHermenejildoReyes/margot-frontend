@@ -11,6 +11,7 @@ import {
   XCircle,
   Package,
   UtensilsCrossed,
+  AlertTriangle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
@@ -28,6 +29,8 @@ const ICON_MAP: Record<string, typeof Bell> = {
   pedido_en_camino: Truck,
   pedido_entregado: Package,
   pedido_cancelado: XCircle,
+  producto_por_vencer: AlertTriangle,
+  producto_vencido: AlertTriangle,
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -37,6 +40,8 @@ const COLOR_MAP: Record<string, string> = {
   pedido_en_camino: "bg-indigo-100 text-indigo-600",
   pedido_entregado: "bg-emerald-100 text-emerald-700",
   pedido_cancelado: "bg-red-100 text-red-600",
+  producto_por_vencer: "bg-amber-100 text-amber-700",
+  producto_vencido: "bg-red-100 text-red-700",
 };
 
 export default function NotificationBell() {
@@ -83,6 +88,8 @@ export default function NotificationBell() {
   useEffect(() => {
     // Initial flag to avoid toasting on first load
     prevCountRef.current = -1;
+    // Trigger caducidad check once per session
+    api.post("/notificaciones/check_caducidades/").catch(() => {});
     fetchNotifs().then(() => {
       // After first fetch, set the ref so future fetches can detect new ones
       // (prevCountRef was set inside fetchNotifs already)
@@ -112,8 +119,11 @@ export default function NotificationBell() {
     } catch {
       /* ignore */
     }
-    // Navigate based on user role
-    if (n.pedido) {
+    // Navigate based on notification type
+    if (n.tipo === "producto_por_vencer" || n.tipo === "producto_vencido") {
+      router.push("/dashboard/caja");
+      setOpen(false);
+    } else if (n.pedido) {
       const isCocinero = user?.tipo_usuario === "cocinero";
       if (isCocinero) {
         router.push("/dashboard/cocina");

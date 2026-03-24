@@ -101,6 +101,7 @@ export default function CajaDiariaPage() {
   const [gastoUnidades, setGastoUnidades] = useState("");
   const [gastoPesoUnidad, setGastoPesoUnidad] = useState("");
   const [gastoUnidadCompra, setGastoUnidadCompra] = useState("kg");
+  const [gastoFechaCaducidad, setGastoFechaCaducidad] = useState("");
 
   /* Crear nuevo insumo inline */
   const [creandoInsumo, setCreandoInsumo] = useState(false);
@@ -346,6 +347,9 @@ export default function CajaDiariaPage() {
         const costoUnit = Number(gastoMonto) / cantidadEnBase;
         payload.costo_unitario_insumo = costoUnit.toFixed(4);
       }
+      if (gastoFechaCaducidad) {
+        payload.fecha_caducidad = gastoFechaCaducidad;
+      }
       await api.post("/gastos-diarios/", payload);
       toast.success(
         isInsumoCategory && gastoInsumo
@@ -371,6 +375,7 @@ export default function CajaDiariaPage() {
     setGastoUnidades("");
     setGastoPesoUnidad("");
     setGastoUnidadCompra("kg");
+    setGastoFechaCaducidad("");
     setCreandoInsumo(false);
     setNuevoInsumoNombre("");
     setNuevoInsumoCategoria("");
@@ -903,6 +908,18 @@ export default function CajaDiariaPage() {
                           {g.costo_unitario_insumo && <> &middot; ${Number(g.costo_unitario_insumo).toFixed(4)}/{g.unidad_medida}</>}
                         </p>
                       )}
+                      {g.fecha_caducidad && (
+                        <p className={clsx(
+                          "text-xs mt-0.5 flex items-center gap-1",
+                          new Date(g.fecha_caducidad) <= new Date() ? "text-red-600 font-semibold" :
+                          new Date(g.fecha_caducidad) <= new Date(Date.now() + 3 * 86400000) ? "text-amber-600" :
+                          "text-gray-500"
+                        )}>
+                          <Calendar className="h-3 w-3" />
+                          Caduca: {new Date(g.fecha_caducidad + "T00:00:00").toLocaleDateString("es-EC")}
+                          {new Date(g.fecha_caducidad) <= new Date() && " — ¡VENCIDO!"}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={clsx(
@@ -1249,6 +1266,28 @@ export default function CajaDiariaPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* 5. Fecha de caducidad (opcional) */}
+                {isInsumoCategory && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Fecha de Caducidad <span className="text-gray-400">(opcional)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={gastoFechaCaducidad}
+                      onChange={(e) => setGastoFechaCaducidad(e.target.value)}
+                      min={today()}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                    />
+                    {gastoFechaCaducidad && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Se generarán alertas cuando el producto esté próximo a vencer
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Acciones */}
                 <div className="flex gap-2">

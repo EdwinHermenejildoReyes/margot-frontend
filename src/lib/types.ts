@@ -489,6 +489,7 @@ export interface GastoDiario {
   unidad_medida?: string;
   cantidad_insumo?: string | null;
   costo_unitario_insumo?: string | null;
+  fecha_caducidad?: string | null;
   created_at: string;
 }
 
