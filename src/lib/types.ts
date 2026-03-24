@@ -508,6 +508,7 @@ export interface CierreCaja {
   id: number;
   fecha: string;
   monto_apertura: string;
+  apertura_at?: string | null;
   ajuste_transferencia?: string | null;
   total_ventas: string;
   total_gastos: string;
@@ -522,10 +523,20 @@ export interface CierreCaja {
   updated_at?: string;
 }
 
+export interface UltimoCierre {
+  id: number;
+  cerrado_at: string | null;
+  cerrado_por: string | null;
+  total_ventas: string;
+  resultado: string;
+}
+
 export interface ResumenDia {
   fecha: string;
   cierre_caja: CierreCaja | null;
   pedidos: Pedido[];
+  productos_vendidos?: ProductoVendido[];
+  ultimo_cierre?: UltimoCierre | null;
   resumen: {
     total_pedidos: number;
     total_ventas: string;
@@ -540,5 +551,43 @@ export interface ResumenDia {
     gastos_transferencia: string;
     total_inversiones: string;
     resultado: string;
+  };
+}
+
+export interface ProductoVendido {
+  nombre: string;
+  tipo: "item" | "promo";
+  cantidad: number;
+  ingreso: string;
+}
+
+export interface HistorialCierre {
+  id: number;
+  fecha: string;
+  monto_apertura: string;
+  total_ventas: string;
+  total_pedidos: number;
+  ventas_efectivo: string;
+  ventas_transferencia: string;
+  ventas_tarjeta: string;
+  total_gastos: string;
+  total_inversiones: string;
+  resultado: string;
+  cerrado: boolean;
+  cerrado_at: string | null;
+  cerrado_por: string | null;
+  observaciones: string;
+}
+
+export interface HistorialResponse {
+  desde: string;
+  hasta: string;
+  cierres: HistorialCierre[];
+  totales: {
+    total_ventas: string;
+    total_gastos: string;
+    total_inversiones: string;
+    resultado: string;
+    dias: number;
   };
 }
