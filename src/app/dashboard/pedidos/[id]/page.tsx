@@ -143,6 +143,8 @@ export default function PedidoDetailPage() {
   const [notesOpenFor, setNotesOpenFor] = useState<number | null>(null);
   const [stockError, setStockError] = useState<StockErrorResponse | null>(null);
   const [stockAction, setStockAction] = useState<"confirmar" | "preparar">("confirmar");
+  const [selectionPromo, setSelectionPromo] = useState<Promocion | null>(null);
+  const [selectionIsAddingItems, setSelectionIsAddingItems] = useState(false);
 
   /* ── Fetch pedido ── */
   const fetchPedido = async () => {
@@ -263,7 +265,59 @@ export default function PedidoDetailPage() {
     toast.success(`${menuItem.name} agregado`);
   };
 
+  const promoNeedsSelection = (promo: Promocion) => {
+    if (promo.tipo === "adicional") return true;
+    if (promo.tipo === "nxm" && promo.items?.some((i) => i.rol === "aplica" && i.category && !i.menu_item)) return true;
+    return false;
+  };
+
+  const selectionTriggerItems = useMemo(() => {
+    if (!selectionPromo?.items) return [];
+    const aplicaItems = selectionPromo.items.filter((i) => i.rol === "aplica");
+    const categoryIds = aplicaItems.map((i) => i.category).filter(Boolean) as number[];
+    const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
+    const precioFiltro = aplicaItems.find((i) => i.precio_filtro)?.precio_filtro;
+    return menuItems.filter((mi) => {
+      const matchesCategory = categoryIds.includes(mi.category);
+      const matchesItem = specificItemIds.includes(mi.id);
+      if (!matchesCategory && !matchesItem) return false;
+      if (precioFiltro && parseFloat(mi.price) !== parseFloat(precioFiltro)) return false;
+      return true;
+    });
+  }, [selectionPromo, menuItems]);
+
+  const addPromoWithSelectedItem = (promo: Promocion, item: MenuItem, isAddingNew: boolean) => {
+    const base = parseFloat(item.price);
+    const precio = promo.tipo === "adicional"
+      ? base + parseFloat(promo.precio_extra || "0")
+      : parseFloat(promo.precio_promocional || "0");
+    const setter = isAddingNew ? setNewPromos : setEditPromos;
+    setter((prev) => {
+      const existing = prev.findIndex((e) => e.promocion_id === promo.id && e.menu_item_seleccionado === item.id);
+      if (existing >= 0) {
+        return prev.map((p, i) =>
+          i === existing ? { ...p, cantidad: p.cantidad + 1 } : p
+        );
+      }
+      return [...prev, {
+        promocion_id: promo.id,
+        nombre: promo.nombre,
+        precio,
+        cantidad: 1,
+        menu_item_seleccionado: item.id,
+        menu_item_seleccionado_nombre: item.name,
+      }];
+    });
+    setSelectionPromo(null);
+    toast.success(`${promo.nombre} agregado`);
+  };
+
   const addNewPromoFromList = (promo: Promocion) => {
+    if (promoNeedsSelection(promo)) {
+      setSelectionPromo(promo);
+      setSelectionIsAddingItems(true);
+      return;
+    }
     const precio = promo.tipo === "adicional"
       ? parseFloat(promo.precio_extra || "0")
       : parseFloat(promo.precio_promocional || "0");
@@ -435,6 +489,11 @@ export default function PedidoDetailPage() {
   };
 
   const addPromoFromList = (promo: Promocion) => {
+    if (promoNeedsSelection(promo)) {
+      setSelectionPromo(promo);
+      setSelectionIsAddingItems(false);
+      return;
+    }
     const precio = promo.tipo === "adicional"
       ? parseFloat(promo.precio_extra || "0")
       : parseFloat(promo.precio_promocional || "0");
@@ -1438,6 +1497,63 @@ export default function PedidoDetailPage() {
               >
                 Listo
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ═══ PROMO SELECTION MODAL ═══ */}
+      {selectionPromo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {selectionPromo.nombre}
+                </h3>
+                <p className="text-sm text-purple-600">
+                  {selectionPromo.tipo === "adicional"
+                    ? `Selecciona el producto base (+$${parseFloat(selectionPromo.precio_extra || "0").toFixed(2)} adicional)`
+                    : `Selecciona el producto (${selectionPromo.cantidad_requerida || 2} unidades por $${parseFloat(selectionPromo.precio_promocional || "0").toFixed(2)})`}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectionPromo(null)}
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {selectionTriggerItems.length === 0 ? (
+                <p className="text-center text-gray-400 py-8">No hay productos disponibles para esta promoción</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectionTriggerItems.map((item) => {
+                    const isAdicional = selectionPromo.tipo === "adicional";
+                    const displayPrice = isAdicional
+                      ? parseFloat(item.price) + parseFloat(selectionPromo.precio_extra || "0")
+                      : parseFloat(selectionPromo.precio_promocional || "0");
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => addPromoWithSelectedItem(selectionPromo, item, selectionIsAddingItems)}
+                        className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-200 bg-white hover:border-purple-400 hover:shadow-md text-left transition-all"
+                      >
+                        <div className="h-12 w-12 rounded-lg bg-purple-100 flex-shrink-0 flex items-center justify-center">
+                          <UtensilsCrossed className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400">${item.price} c/u</p>
+                          <p className="text-sm font-bold text-purple-600">
+                            {isAdicional ? `Total: $${displayPrice.toFixed(2)}` : `${selectionPromo.cantidad_requerida || 2} × $${displayPrice.toFixed(2)}`}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
