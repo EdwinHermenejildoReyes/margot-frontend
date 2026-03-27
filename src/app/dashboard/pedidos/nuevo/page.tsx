@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque, Promocion } from "@/lib/types";
+import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque, Promocion, ExtraSeleccionado } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
   ArrowLeft,
@@ -38,6 +38,7 @@ interface CartItem {
   cantidad: number;
   notas: string;
   salsas_seleccionadas?: string[];
+  extras_seleccionados?: ExtraSeleccionado[];
 }
 
 /* ── Alitas sauce config ── */
@@ -236,7 +237,7 @@ export default function NuevoPedidoPage() {
           c.menuItem.id === item.id ? { ...c, cantidad: c.cantidad + 1 } : c
         );
       }
-      return [...prev, { menuItem: item, cantidad: 1, notas: "", salsas_seleccionadas: [] }];
+      return [...prev, { menuItem: item, cantidad: 1, notas: "", salsas_seleccionadas: [], extras_seleccionados: [] }];
     });
   };
 
@@ -275,8 +276,28 @@ export default function NuevoPedidoPage() {
     );
   };
 
+  const toggleExtra = (itemId: number, extra: { id: number; nombre: string; precio: string }) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.menuItem.id !== itemId) return c;
+        const current = c.extras_seleccionados || [];
+        const exists = current.find((e) => e.extra_id === extra.id);
+        if (exists) {
+          return { ...c, extras_seleccionados: current.filter((e) => e.extra_id !== extra.id) };
+        }
+        return {
+          ...c,
+          extras_seleccionados: [...current, { extra_id: extra.id, nombre: extra.nombre, precio: extra.precio }],
+        };
+      })
+    );
+  };
+
   const cartTotal = useMemo(
-    () => cart.reduce((sum, c) => sum + parseFloat(c.menuItem.price) * c.cantidad, 0),
+    () => cart.reduce((sum, c) => {
+      const extrasTotal = (c.extras_seleccionados || []).reduce((s, e) => s + parseFloat(e.precio), 0);
+      return sum + (parseFloat(c.menuItem.price) + extrasTotal) * c.cantidad;
+    }, 0),
     [cart]
   );
 
@@ -517,6 +538,9 @@ export default function NuevoPedidoPage() {
           notas: c.notas || undefined,
           ...(c.salsas_seleccionadas && c.salsas_seleccionadas.length > 0
             ? { salsas_seleccionadas: c.salsas_seleccionadas }
+            : {}),
+          ...(c.extras_seleccionados && c.extras_seleccionados.length > 0
+            ? { extras_seleccionados: c.extras_seleccionados }
             : {}),
         })),
         promociones: cartPromos.map((cp) => ({
@@ -994,7 +1018,7 @@ export default function NuevoPedidoPage() {
                       </button>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 w-16 text-right">
-                      ${(parseFloat(item.menuItem.price) * item.cantidad).toFixed(2)}
+                      ${((parseFloat(item.menuItem.price) + (item.extras_seleccionados || []).reduce((s, e) => s + parseFloat(e.precio), 0)) * item.cantidad).toFixed(2)}
                     </p>
                     <button
                       onClick={() => removeFromCart(item.menuItem.id)}
@@ -1069,6 +1093,35 @@ export default function NuevoPedidoPage() {
                           Faltan {getMaxSalsas(item.menuItem) - (item.salsas_seleccionadas?.length || 0)} por elegir
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Extras selector */}
+                  {item.menuItem.extras_disponibles && item.menuItem.extras_disponibles.length > 0 && (
+                    <div className="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-xs font-medium text-blue-800 mb-1.5">
+                        ➕ Extras disponibles:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.menuItem.extras_disponibles.map((extra) => {
+                          const selected = item.extras_seleccionados?.some((e) => e.extra_id === extra.id);
+                          return (
+                            <button
+                              key={extra.id}
+                              type="button"
+                              onClick={() => toggleExtra(item.menuItem.id, extra)}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-full text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-blue-500 text-white shadow-sm"
+                                  : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-100"
+                              )}
+                            >
+                              {extra.nombre} (+${extra.precio})
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

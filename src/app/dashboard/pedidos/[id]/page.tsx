@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { MenuItem, Category, PaginatedResponse, Promocion } from "@/lib/types";
+import type { MenuItem, Category, PaginatedResponse, Promocion, ExtraSeleccionado } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import clsx from "clsx";
@@ -42,6 +42,7 @@ interface DetallePedido {
   subtotal: string;
   notas?: string;
   salsas_seleccionadas?: string[];
+  extras_seleccionados?: ExtraSeleccionado[];
 }
 
 interface PromocionPedido {
@@ -89,7 +90,9 @@ interface EditItem {
   cantidad: number;
   notas: string;
   salsas_seleccionadas?: string[];
+  extras_seleccionados?: ExtraSeleccionado[];
   category_name?: string;
+  extras_disponibles?: { id: number; nombre: string; precio: string; is_active: boolean }[];
 }
 
 /* ── Alitas sauce config ── */
@@ -196,15 +199,20 @@ export default function PedidoDetailPage() {
   const startEditing = () => {
     if (!pedido) return;
     setEditItems(
-      pedido.detalles.map((d) => ({
-        menu_item_id: d.menu_item,
-        name: d.menu_item_nombre || d.menu_item_name || `Ítem #${d.menu_item}`,
-        price: parseFloat(d.precio_unitario),
-        cantidad: d.cantidad,
-        notas: d.notas || "",
-        salsas_seleccionadas: d.salsas_seleccionadas || [],
-        category_name: d.menu_item_category_name,
-      }))
+      pedido.detalles.map((d) => {
+        const mi = menuItems.find((m) => m.id === d.menu_item);
+        return {
+          menu_item_id: d.menu_item,
+          name: d.menu_item_nombre || d.menu_item_name || `Ítem #${d.menu_item}`,
+          price: parseFloat(d.precio_unitario),
+          cantidad: d.cantidad,
+          notas: d.notas || "",
+          salsas_seleccionadas: d.salsas_seleccionadas || [],
+          extras_seleccionados: d.extras_seleccionados || [],
+          category_name: d.menu_item_category_name,
+          extras_disponibles: mi?.extras_disponibles,
+        };
+      })
     );
     setEditPromos(
       (pedido.promociones || []).map((p) => ({
@@ -258,7 +266,9 @@ export default function PedidoDetailPage() {
           cantidad: 1,
           notas: "",
           salsas_seleccionadas: [],
+          extras_seleccionados: [],
           category_name: menuItem.category_name,
+          extras_disponibles: menuItem.extras_disponibles,
         },
       ];
     });
@@ -368,6 +378,23 @@ export default function PedidoDetailPage() {
     );
   };
 
+  const toggleNewItemExtra = (idx: number, extra: { id: number; nombre: string; precio: string }) => {
+    setNewItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const current = item.extras_seleccionados || [];
+        const exists = current.find((e) => e.extra_id === extra.id);
+        if (exists) {
+          return { ...item, extras_seleccionados: current.filter((e) => e.extra_id !== extra.id) };
+        }
+        return {
+          ...item,
+          extras_seleccionados: [...current, { extra_id: extra.id, nombre: extra.nombre, precio: extra.precio }],
+        };
+      })
+    );
+  };
+
   const updateNewPromoQty = (idx: number, delta: number) => {
     setNewPromos((prev) =>
       prev
@@ -384,7 +411,10 @@ export default function PedidoDetailPage() {
 
   const newItemsTotal = useMemo(
     () =>
-      newItems.reduce((sum, item) => sum + item.price * item.cantidad, 0) +
+      newItems.reduce((sum, item) => {
+        const extrasTotal = (item.extras_seleccionados || []).reduce((s, e) => s + parseFloat(e.precio), 0);
+        return sum + (item.price + extrasTotal) * item.cantidad;
+      }, 0) +
       newPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0),
     [newItems, newPromos]
   );
@@ -403,6 +433,9 @@ export default function PedidoDetailPage() {
           notas: item.notas || "",
           ...(item.salsas_seleccionadas && item.salsas_seleccionadas.length > 0
             ? { salsas_seleccionadas: item.salsas_seleccionadas }
+            : {}),
+          ...(item.extras_seleccionados && item.extras_seleccionados.length > 0
+            ? { extras_seleccionados: item.extras_seleccionados }
             : {}),
         })),
         promociones: newPromos.map((p) => ({
@@ -464,6 +497,23 @@ export default function PedidoDetailPage() {
     );
   };
 
+  const toggleEditExtra = (idx: number, extra: { id: number; nombre: string; precio: string }) => {
+    setEditItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const current = item.extras_seleccionados || [];
+        const exists = current.find((e) => e.extra_id === extra.id);
+        if (exists) {
+          return { ...item, extras_seleccionados: current.filter((e) => e.extra_id !== extra.id) };
+        }
+        return {
+          ...item,
+          extras_seleccionados: [...current, { extra_id: extra.id, nombre: extra.nombre, precio: extra.precio }],
+        };
+      })
+    );
+  };
+
   const addItemFromMenu = (menuItem: MenuItem) => {
     setEditItems((prev) => {
       const existing = prev.findIndex((e) => e.menu_item_id === menuItem.id);
@@ -481,7 +531,9 @@ export default function PedidoDetailPage() {
           cantidad: 1,
           notas: "",
           salsas_seleccionadas: [],
+          extras_seleccionados: [],
           category_name: menuItem.category_name,
+          extras_disponibles: menuItem.extras_disponibles,
         },
       ];
     });
@@ -525,7 +577,10 @@ export default function PedidoDetailPage() {
 
   const editTotal = useMemo(
     () =>
-      editItems.reduce((sum, item) => sum + item.price * item.cantidad, 0) +
+      editItems.reduce((sum, item) => {
+        const extrasTotal = (item.extras_seleccionados || []).reduce((s, e) => s + parseFloat(e.precio), 0);
+        return sum + (item.price + extrasTotal) * item.cantidad;
+      }, 0) +
       editPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0),
     [editItems, editPromos]
   );
@@ -546,6 +601,9 @@ export default function PedidoDetailPage() {
           notas: item.notas || "",
           ...(item.salsas_seleccionadas && item.salsas_seleccionadas.length > 0
             ? { salsas_seleccionadas: item.salsas_seleccionadas }
+            : {}),
+          ...(item.extras_seleccionados && item.extras_seleccionados.length > 0
+            ? { extras_seleccionados: item.extras_seleccionados }
             : {}),
         })),
         promociones: editPromos.map((p) => ({
@@ -795,6 +853,9 @@ export default function PedidoDetailPage() {
                     {det.salsas_seleccionadas && det.salsas_seleccionadas.length > 0 && (
                       <p className="text-xs text-amber-600 mt-1">🍗 Salsas: {det.salsas_seleccionadas.join(", ")}</p>
                     )}
+                    {det.extras_seleccionados && det.extras_seleccionados.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-1">➕ Extras: {det.extras_seleccionados.map((e) => `${e.nombre} (+$${e.precio})`).join(", ")}</p>
+                    )}
                     {det.notas && (
                       <p className="text-xs text-gray-400 italic mt-1">📝 {det.notas}</p>
                     )}
@@ -943,6 +1004,35 @@ export default function PedidoDetailPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Extras selector in edit mode */}
+                  {item.extras_disponibles && item.extras_disponibles.length > 0 && (
+                    <div className="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-xs font-medium text-blue-800 mb-1.5">
+                        ➕ Extras disponibles:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.extras_disponibles.map((extra) => {
+                          const selected = item.extras_seleccionados?.some((e) => e.extra_id === extra.id);
+                          return (
+                            <button
+                              key={extra.id}
+                              type="button"
+                              onClick={() => toggleEditExtra(idx, extra)}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-full text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-blue-500 text-white shadow-sm"
+                                  : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-100"
+                              )}
+                            >
+                              {extra.nombre} (+${extra.precio})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -1016,6 +1106,9 @@ export default function PedidoDetailPage() {
                     </p>
                     {det.salsas_seleccionadas && det.salsas_seleccionadas.length > 0 && (
                       <p className="text-xs text-amber-600 mt-1">🍗 Salsas: {det.salsas_seleccionadas.join(", ")}</p>
+                    )}
+                    {det.extras_seleccionados && det.extras_seleccionados.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-1">➕ Extras: {det.extras_seleccionados.map((e) => `${e.nombre} (+$${e.precio})`).join(", ")}</p>
                     )}
                     {det.notas && (
                       <p className="text-xs text-gray-400 italic mt-1">📝 {det.notas}</p>
@@ -1145,6 +1238,35 @@ export default function PedidoDetailPage() {
                           Faltan {getMaxSalsasFromName(item.name, item.category_name) - (item.salsas_seleccionadas?.length || 0)} por elegir
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Extras selector for new items */}
+                  {item.extras_disponibles && item.extras_disponibles.length > 0 && (
+                    <div className="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-xs font-medium text-blue-800 mb-1.5">
+                        ➕ Extras disponibles:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.extras_disponibles.map((extra) => {
+                          const selected = item.extras_seleccionados?.some((e) => e.extra_id === extra.id);
+                          return (
+                            <button
+                              key={extra.id}
+                              type="button"
+                              onClick={() => toggleNewItemExtra(idx, extra)}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-full text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-blue-500 text-white shadow-sm"
+                                  : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-100"
+                              )}
+                            >
+                              {extra.nombre} (+${extra.precio})
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

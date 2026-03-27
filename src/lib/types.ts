@@ -36,6 +36,13 @@ export interface Section {
   description?: string;
 }
 
+export interface Extra {
+  id: number;
+  nombre: string;
+  precio: string;
+  is_active: boolean;
+}
+
 export interface MenuItem {
   id: number;
   category: number;
@@ -51,6 +58,7 @@ export interface MenuItem {
   preparation_time?: number;
   calories?: number;
   order: number;
+  extras_disponibles?: Extra[];
 }
 
 export interface Ingredient {
@@ -85,6 +93,12 @@ export interface Pedido {
   metodo_pago?: { metodo: string; display: string } | null;
 }
 
+export interface ExtraSeleccionado {
+  extra_id: number;
+  nombre: string;
+  precio: string;
+}
+
 export interface PedidoDetalle {
   id: number;
   menu_item: number;
@@ -96,6 +110,7 @@ export interface PedidoDetalle {
   subtotal: string;
   notas?: string;
   salsas_seleccionadas?: string[];
+  extras_seleccionados?: ExtraSeleccionado[];
 }
 
 export interface PromocionItem {
