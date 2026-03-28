@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/permissions";
-import type { Pedido, PedidoDetalle, PedidoPromocion } from "@/lib/types";
+import type { Pedido, PedidoDetalle, PedidoPromocion, PedidoExtraSuelto } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import StockInsuficienteModal, {
@@ -25,6 +25,7 @@ import clsx from "clsx";
 interface PedidoCocina extends Pedido {
   detalles?: PedidoDetalle[];
   promociones?: PedidoPromocion[];
+  extras_sueltos?: PedidoExtraSuelto[];
 }
 
 export default function CocinaPage() {
@@ -55,7 +56,7 @@ export default function CocinaPage() {
           }
         ),
       })).filter(
-        (p) => (p.detalles?.length || 0) + (p.promociones?.length || 0) > 0
+        (p) => (p.detalles?.length || 0) + (p.promociones?.length || 0) + (p.extras_sueltos?.length || 0) > 0
       );
       setPedidos(filtered);
     } catch {
@@ -279,6 +280,9 @@ function PedidoCard({
               {det.salsas_seleccionadas && det.salsas_seleccionadas.length > 0 && (
                 <p className="text-xs text-amber-700 mt-0.5">🍗 Salsas: {det.salsas_seleccionadas.join(", ")}</p>
               )}
+              {det.extras_seleccionados && det.extras_seleccionados.length > 0 && (
+                <p className="text-xs text-blue-600 mt-0.5 font-semibold">➕ {det.extras_seleccionados.map((e: { nombre: string }) => e.nombre).join(", ")}</p>
+              )}
             </div>
           </div>
         ))}
@@ -304,6 +308,21 @@ function PedidoCard({
             </div>
           );
         })}
+        {pedido.extras_sueltos?.map((es) => (
+          <div key={`extra-${es.id}`} className="flex items-start gap-2">
+            <span className="h-6 w-6 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+              {es.cantidad}
+            </span>
+            <div>
+              <span className="text-sm font-medium text-gray-900">
+                {es.extra_nombre}
+              </span>
+              <span className="ml-1.5 text-xs text-purple-600 font-medium">
+                🧩 Extra suelto
+              </span>
+            </div>
+          </div>
+        ))}
         {pedido.notas && (
           <div className="mt-2 p-2 rounded-lg bg-yellow-100 text-yellow-800 text-xs">
             📝 {pedido.notas}

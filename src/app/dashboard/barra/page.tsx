@@ -274,6 +274,9 @@ function PedidoCard({
               {det.notas && (
                 <p className="text-xs text-yellow-700 mt-0.5">📝 {det.notas}</p>
               )}
+              {det.extras_seleccionados && det.extras_seleccionados.length > 0 && (
+                <p className="text-xs text-blue-600 mt-0.5 font-semibold">➕ {det.extras_seleccionados.map((e: { nombre: string }) => e.nombre).join(", ")}</p>
+              )}
             </div>
           </div>
         ))}

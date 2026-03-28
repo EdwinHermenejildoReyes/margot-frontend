@@ -250,8 +250,10 @@ export interface ComandaCocina {
 export interface ComandaDetalle {
   id: number;
   comanda: number;
-  menu_item: number;
+  menu_item?: number;
   menu_item_name?: string;
+  extra?: number;
+  extra_nombre?: string;
   cantidad: number;
   estado: string;
   notas?: string;

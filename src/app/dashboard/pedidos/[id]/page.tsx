@@ -863,7 +863,7 @@ export default function PedidoDetailPage() {
               </button>
               <button
                 onClick={saveNewItems}
-                disabled={savingNew || (newItems.length === 0 && newPromos.length === 0)}
+                disabled={savingNew || (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0)}
                 className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-2"
               >
                 <Save className="h-4 w-4" />
@@ -1658,7 +1658,7 @@ export default function PedidoDetailPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Subtotal</span>
                 <span className="text-gray-900">
-                  ${editing ? editTotal.toFixed(2) : pedido.subtotal}
+                  ${editing ? editTotal.toFixed(2) : addingItems ? (parseFloat(pedido.subtotal) + newItemsTotal).toFixed(2) : pedido.subtotal}
                 </span>
               </div>
               {!editing && (
@@ -1682,7 +1682,7 @@ export default function PedidoDetailPage() {
               <div className="border-t pt-3 flex justify-between font-semibold">
                 <span>Total</span>
                 <span className="text-brand-gold text-lg">
-                  ${editing ? editTotal.toFixed(2) : pedido.total}
+                  ${editing ? editTotal.toFixed(2) : addingItems ? (parseFloat(pedido.total) + newItemsTotal).toFixed(2) : pedido.total}
                 </span>
               </div>
             </div>
