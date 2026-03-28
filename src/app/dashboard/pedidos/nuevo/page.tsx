@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque, Promocion, ExtraSeleccionado } from "@/lib/types";
+import type { MenuItem, Category, Mesa, Atencion, PaginatedResponse, TipoEmpaque, Promocion, ExtraSeleccionado, Extra } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
   ArrowLeft,
@@ -102,6 +102,10 @@ export default function NuevoPedidoPage() {
   const [cartEmpaques, setCartEmpaques] = useState<Map<number, number>>(new Map()); // tipoEmpaqueId → cantidad
   const [costoDelivery, setCostoDelivery] = useState<string>("");
 
+  /* ── Extras sueltos states ── */
+  const [allExtras, setAllExtras] = useState<Extra[]>([]);
+  const [cartExtrasSueltos, setCartExtrasSueltos] = useState<Map<number, number>>(new Map()); // extraId → cantidad
+
   /* ── Código de descuento ── */
   const [codigoInput, setCodigoInput] = useState("");
   const [codigoDescuento, setCodigoDescuento] = useState<{
@@ -122,13 +126,14 @@ export default function NuevoPedidoPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [menuRes, catRes, mesasRes, atencionesRes, empaquesRes, promosRes] = await Promise.all([
+        const [menuRes, catRes, mesasRes, atencionesRes, empaquesRes, promosRes, extrasRes] = await Promise.all([
           api.get<PaginatedResponse<MenuItem>>("/menu-items/?page_size=200&is_available=true"),
           api.get<PaginatedResponse<Category>>("/categorias/?page_size=50"),
           api.get<PaginatedResponse<Mesa>>("/mesas/"),
           api.get("/atenciones/activas/"),
           api.get<PaginatedResponse<TipoEmpaque>>("/tipos-empaque/?page_size=50"),
           api.get("/promociones/vigentes/"),
+          api.get<PaginatedResponse<Extra>>("/extras/?page_size=100"),
         ]);
         setMenuItems(menuRes.data.results || []);
         setCategories(catRes.data.results || []);
@@ -136,6 +141,7 @@ export default function NuevoPedidoPage() {
         setAtenciones(Array.isArray(atencionesRes.data) ? atencionesRes.data : atencionesRes.data.results || []);
         setTiposEmpaque(empaquesRes.data.results || []);
         setPromociones(Array.isArray(promosRes.data) ? promosRes.data : promosRes.data.results || []);
+        setAllExtras(extrasRes.data.results || []);
       } catch {
         toast.error("Error al cargar datos");
       } finally {
@@ -419,9 +425,18 @@ export default function NuevoPedidoPage() {
     [tiposEmpaque, hasPizzaInCart]
   );
 
+  const extrasSueltosTotal = useMemo(() => {
+    let total = 0;
+    cartExtrasSueltos.forEach((cantidad, extraId) => {
+      const extra = allExtras.find((e) => e.id === extraId);
+      if (extra) total += parseFloat(extra.precio) * cantidad;
+    });
+    return total;
+  }, [cartExtrasSueltos, allExtras]);
+
   const grandTotal = useMemo(
-    () => cartTotal + promosTotal + empaquesTotal + deliveryTotal - (codigoDescuento ? parseFloat(codigoDescuento.monto_descuento) : 0),
-    [cartTotal, promosTotal, empaquesTotal, deliveryTotal, codigoDescuento]
+    () => cartTotal + promosTotal + empaquesTotal + extrasSueltosTotal + deliveryTotal - (codigoDescuento ? parseFloat(codigoDescuento.monto_descuento) : 0),
+    [cartTotal, promosTotal, empaquesTotal, extrasSueltosTotal, deliveryTotal, codigoDescuento]
   );
 
   /* ── Auto-select caja de pizza when pizza is in cart ── */
@@ -459,6 +474,18 @@ export default function NuevoPedidoPage() {
     });
   };
 
+  /* ── Extras sueltos helpers ── */
+  const updateExtraSueltoCantidad = (extraId: number, delta: number) => {
+    setCartExtrasSueltos((prev) => {
+      const next = new Map(prev);
+      const current = next.get(extraId) || 0;
+      const newVal = Math.max(0, current + delta);
+      if (newVal === 0) next.delete(extraId);
+      else next.set(extraId, newVal);
+      return next;
+    });
+  };
+
   /* ── Submit order ── */
   const handleValidarCodigo = async () => {
     const code = codigoInput.trim();
@@ -492,8 +519,8 @@ export default function NuevoPedidoPage() {
   };
 
   const handleSubmit = async (skipEmpaqueCheck = false) => {
-    if (cart.length === 0 && cartPromos.length === 0) {
-      toast.error("Agrega al menos un ítem o promoción al pedido");
+    if (cart.length === 0 && cartPromos.length === 0 && cartExtrasSueltos.size === 0) {
+      toast.error("Agrega al menos un ítem, promoción o extra al pedido");
       return;
     }
 
@@ -564,6 +591,15 @@ export default function NuevoPedidoPage() {
           if (cantidad > 0) empaques.push({ tipo_empaque: tipoId, cantidad });
         });
         if (empaques.length > 0) payload.empaques = empaques;
+      }
+
+      // Extras sueltos
+      if (cartExtrasSueltos.size > 0) {
+        const extrasSueltos: { extra: number; cantidad: number }[] = [];
+        cartExtrasSueltos.forEach((cantidad, extraId) => {
+          if (cantidad > 0) extrasSueltos.push({ extra: extraId, cantidad });
+        });
+        if (extrasSueltos.length > 0) payload.extras_sueltos = extrasSueltos;
       }
 
       // Costo delivery (solo domicilio)
@@ -934,6 +970,45 @@ export default function NuevoPedidoPage() {
             </div>
           )}
 
+          {/* Extras sueltos selector */}
+          {allExtras.length > 0 && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
+                <Plus className="h-3.5 w-3.5" />
+                Extras sueltos (sin plato)
+              </label>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {allExtras.map((extra) => {
+                  const cant = cartExtrasSueltos.get(extra.id) || 0;
+                  return (
+                    <div key={extra.id} className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-700 truncate">{extra.nombre}</p>
+                        <p className="text-[10px] text-gray-400">${extra.precio}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateExtraSueltoCantidad(extra.id, -1)}
+                          className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-xs"
+                          disabled={cant === 0}
+                        >
+                          <Minus className="h-2.5 w-2.5" />
+                        </button>
+                        <span className="text-xs font-semibold w-5 text-center">{cant}</span>
+                        <button
+                          onClick={() => updateExtraSueltoCantidad(extra.id, 1)}
+                          className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-xs"
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Delivery cost (solo domicilio) */}
           {tipoEntrega === "domicilio" && (
             <div>
@@ -1273,6 +1348,12 @@ export default function NuevoPedidoPage() {
               <span className="text-sm text-gray-700">${empaquesTotal.toFixed(2)}</span>
             </div>
           )}
+          {extrasSueltosTotal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Extras sueltos</span>
+              <span className="text-sm text-blue-600">${extrasSueltosTotal.toFixed(2)}</span>
+            </div>
+          )}
           {deliveryTotal > 0 && (
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Delivery</span>
@@ -1293,7 +1374,7 @@ export default function NuevoPedidoPage() {
           </div>
           <button
             onClick={() => handleSubmit()}
-            disabled={saving || (cart.length === 0 && cartPromos.length === 0)}
+            disabled={saving || (cart.length === 0 && cartPromos.length === 0 && cartExtrasSueltos.size === 0)}
             className="w-full py-3 px-4 rounded-xl bg-brand-gold text-white font-semibold text-sm hover:bg-brand-bronze focus:outline-none focus:ring-2 focus:ring-brand-gold focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {saving ? (

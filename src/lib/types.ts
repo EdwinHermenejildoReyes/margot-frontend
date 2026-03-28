@@ -90,6 +90,7 @@ export interface Pedido {
   detalles?: PedidoDetalle[];
   promociones?: PedidoPromocion[];
   empaques?: PedidoEmpaque[];
+  extras_sueltos?: PedidoExtraSuelto[];
   metodo_pago?: { metodo: string; display: string } | null;
 }
 
@@ -97,6 +98,15 @@ export interface ExtraSeleccionado {
   extra_id: number;
   nombre: string;
   precio: string;
+}
+
+export interface PedidoExtraSuelto {
+  id: number;
+  extra: number;
+  extra_nombre: string;
+  cantidad: number;
+  precio_unitario: string;
+  subtotal: string;
 }
 
 export interface PedidoDetalle {

@@ -554,8 +554,9 @@ export default function LandingPage() {
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden min-h-[350px] flex items-center justify-center">
+              {contacto.google_maps_embed ? (
               <iframe
-                src={contacto.google_maps_embed || ""}
+                src={contacto.google_maps_embed}
                 width="100%"
                 height="100%"
                 style={{ border: 0, minHeight: "350px" }}
@@ -564,6 +565,9 @@ export default function LandingPage() {
                 referrerPolicy="no-referrer-when-downgrade"
                 title="Ubicación de Margot"
               />
+              ) : (
+                <p className="text-white/40 text-sm">Mapa no disponible</p>
+              )}
             </div>
           </div>
         </div>

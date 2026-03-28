@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { MenuItem, Category, PaginatedResponse, Promocion, ExtraSeleccionado } from "@/lib/types";
+import type { MenuItem, Category, PaginatedResponse, Promocion, ExtraSeleccionado, Extra } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import clsx from "clsx";
@@ -75,6 +75,14 @@ interface PedidoDetail {
   atencion?: number;
   detalles: DetallePedido[];
   promociones?: PromocionPedido[];
+  extras_sueltos?: Array<{
+    id: number;
+    extra: number;
+    extra_nombre: string;
+    cantidad: number;
+    precio_unitario: string;
+    subtotal: string;
+  }>;
   pagos: Array<{
     id: number;
     metodo_pago: string;
@@ -126,6 +134,7 @@ export default function PedidoDetailPage() {
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<EditItem[]>([]);
   const [editPromos, setEditPromos] = useState<EditPromo[]>([]);
+  const [editExtrasSueltos, setEditExtrasSueltos] = useState<Map<number, number>>(new Map());
   const [editNotas, setEditNotas] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -133,6 +142,7 @@ export default function PedidoDetailPage() {
   const [addingItems, setAddingItems] = useState(false);
   const [newItems, setNewItems] = useState<EditItem[]>([]);
   const [newPromos, setNewPromos] = useState<EditPromo[]>([]);
+  const [newExtrasSueltos, setNewExtrasSueltos] = useState<Map<number, number>>(new Map());
   const [savingNew, setSavingNew] = useState(false);
 
   /* add-item modal */
@@ -140,6 +150,7 @@ export default function PedidoDetailPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [allPromos, setAllPromos] = useState<Promocion[]>([]);
+  const [allExtras, setAllExtras] = useState<Extra[]>([]);
   const [menuSearch, setMenuSearch] = useState("");
   const [menuCategory, setMenuCategory] = useState<number | "promociones" | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
@@ -196,8 +207,15 @@ export default function PedidoDetailPage() {
   };
 
   /* ── Edit mode helpers ── */
-  const startEditing = () => {
+  const startEditing = async () => {
     if (!pedido) return;
+    // Fetch extras if not already loaded
+    if (allExtras.length === 0) {
+      try {
+        const res = await api.get<PaginatedResponse<Extra>>("/extras/?page_size=100");
+        setAllExtras(res.data.results || []);
+      } catch { /* ignore */ }
+    }
     setEditItems(
       pedido.detalles.map((d) => {
         const mi = menuItems.find((m) => m.id === d.menu_item);
@@ -225,6 +243,10 @@ export default function PedidoDetailPage() {
       }))
     );
     setEditNotas(pedido.notas || "");
+    // Load existing extras sueltos
+    const esMap = new Map<number, number>();
+    (pedido.extras_sueltos || []).forEach((es) => esMap.set(es.extra, es.cantidad));
+    setEditExtrasSueltos(esMap);
     setEditing(true);
   };
 
@@ -232,6 +254,7 @@ export default function PedidoDetailPage() {
     setEditing(false);
     setEditItems([]);
     setEditPromos([]);
+    setEditExtrasSueltos(new Map());
     setShowAddModal(false);
   };
 
@@ -239,6 +262,7 @@ export default function PedidoDetailPage() {
   const startAddingItems = () => {
     setNewItems([]);
     setNewPromos([]);
+    setNewExtrasSueltos(new Map());
     setAddingItems(true);
   };
 
@@ -246,6 +270,7 @@ export default function PedidoDetailPage() {
     setAddingItems(false);
     setNewItems([]);
     setNewPromos([]);
+    setNewExtrasSueltos(new Map());
     setShowAddModal(false);
   };
 
@@ -415,13 +440,29 @@ export default function PedidoDetailPage() {
         const extrasTotal = (item.extras_seleccionados || []).reduce((s, e) => s + parseFloat(e.precio), 0);
         return sum + (item.price + extrasTotal) * item.cantidad;
       }, 0) +
-      newPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0),
-    [newItems, newPromos]
+      newPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0) +
+      Array.from(newExtrasSueltos.entries()).reduce((sum, [extraId, cant]) => {
+        const extra = allExtras.find((e) => e.id === extraId);
+        return sum + (extra ? parseFloat(extra.precio) * cant : 0);
+      }, 0),
+    [newItems, newPromos, newExtrasSueltos, allExtras]
   );
 
+  const updateExtraSueltoCantidad = (extraId: number, delta: number, isEdit: boolean) => {
+    const setter = isEdit ? setEditExtrasSueltos : setNewExtrasSueltos;
+    setter((prev) => {
+      const next = new Map(prev);
+      const current = next.get(extraId) || 0;
+      const newVal = Math.max(0, current + delta);
+      if (newVal === 0) next.delete(extraId);
+      else next.set(extraId, newVal);
+      return next;
+    });
+  };
+
   const saveNewItems = async () => {
-    if (newItems.length === 0 && newPromos.length === 0) {
-      toast.error("Debes agregar al menos un ítem o promoción");
+    if (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0) {
+      toast.error("Debes agregar al menos un ítem, promoción o extra");
       return;
     }
     setSavingNew(true);
@@ -443,11 +484,15 @@ export default function PedidoDetailPage() {
           cantidad: p.cantidad,
           ...(p.menu_item_seleccionado ? { menu_item_seleccionado: p.menu_item_seleccionado } : {}),
         })),
+        extras_sueltos: Array.from(newExtrasSueltos.entries())
+          .filter(([, cant]) => cant > 0)
+          .map(([extraId, cant]) => ({ extra: extraId, cantidad: cant })),
       });
       setPedido(data);
       setAddingItems(false);
       setNewItems([]);
       setNewPromos([]);
+      setNewExtrasSueltos(new Map());
       toast.success("Ítems agregados — nueva comanda enviada a cocina ⚡");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: StockErrorResponse & { error?: string } } };
@@ -581,13 +626,17 @@ export default function PedidoDetailPage() {
         const extrasTotal = (item.extras_seleccionados || []).reduce((s, e) => s + parseFloat(e.precio), 0);
         return sum + (item.price + extrasTotal) * item.cantidad;
       }, 0) +
-      editPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0),
-    [editItems, editPromos]
+      editPromos.reduce((sum, p) => sum + p.precio * p.cantidad, 0) +
+      Array.from(editExtrasSueltos.entries()).reduce((sum, [extraId, cant]) => {
+        const extra = allExtras.find((e) => e.id === extraId);
+        return sum + (extra ? parseFloat(extra.precio) * cant : 0);
+      }, 0),
+    [editItems, editPromos, editExtrasSueltos, allExtras]
   );
 
   /* ── Save edits ── */
   const saveEdits = async () => {
-    if (editItems.length === 0 && editPromos.length === 0) {
+    if (editItems.length === 0 && editPromos.length === 0 && editExtrasSueltos.size === 0) {
       toast.error("El pedido debe tener al menos un ítem o promoción");
       return;
     }
@@ -611,6 +660,9 @@ export default function PedidoDetailPage() {
           cantidad: p.cantidad,
           ...(p.menu_item_seleccionado ? { menu_item_seleccionado: p.menu_item_seleccionado } : {}),
         })),
+        extras_sueltos: Array.from(editExtrasSueltos.entries())
+          .filter(([, cant]) => cant > 0)
+          .map(([extraId, cant]) => ({ extra: extraId, cantidad: cant })),
       });
       setPedido(data);
       setEditing(false);
@@ -628,14 +680,16 @@ export default function PedidoDetailPage() {
     if (menuItems.length === 0) {
       setMenuLoading(true);
       try {
-        const [menuRes, catRes, promosRes] = await Promise.all([
+        const [menuRes, catRes, promosRes, extrasRes] = await Promise.all([
           api.get<PaginatedResponse<MenuItem>>("/menu-items/?page_size=200&is_available=true"),
           api.get<PaginatedResponse<Category>>("/categorias/?page_size=50"),
           api.get("/promociones/vigentes/"),
+          api.get<PaginatedResponse<Extra>>("/extras/?page_size=100"),
         ]);
         setMenuItems(menuRes.data.results || []);
         setCategories(catRes.data.results || []);
         setAllPromos(Array.isArray(promosRes.data) ? promosRes.data : promosRes.data.results || []);
+        setAllExtras(extrasRes.data.results || []);
       } catch {
         toast.error("Error al cargar el menú");
       } finally {
@@ -886,7 +940,27 @@ export default function PedidoDetailPage() {
                   ))}
                 </>
               )}
-              {(!pedido.detalles || pedido.detalles.length === 0) && (!pedido.promociones || pedido.promociones.length === 0) && (
+              {/* Extras sueltos in view mode */}
+              {pedido.extras_sueltos && pedido.extras_sueltos.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-green-50 flex items-center gap-2">
+                    <Plus className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-xs font-semibold text-green-700 uppercase">Extras sueltos</span>
+                  </div>
+                  {pedido.extras_sueltos.map((es) => (
+                    <div key={`es-${es.id}`} className="px-6 py-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{es.extra_nombre}</p>
+                        <p className="text-xs text-green-600">
+                          Cantidad: {es.cantidad} × ${es.precio_unitario}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">${es.subtotal}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {(!pedido.detalles || pedido.detalles.length === 0) && (!pedido.promociones || pedido.promociones.length === 0) && (!pedido.extras_sueltos || pedido.extras_sueltos.length === 0) && (
                 <div className="px-6 py-8 text-center text-sm text-gray-400">Sin ítems</div>
               )}
             </div>
@@ -1083,6 +1157,52 @@ export default function PedidoDetailPage() {
                 </>
               )}
 
+              {/* Extras sueltos in edit mode */}
+              {allExtras.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-green-50 flex items-center gap-2">
+                    <Plus className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-xs font-semibold text-green-700 uppercase">Extras sueltos</span>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {allExtras.map((extra) => {
+                        const cant = editExtrasSueltos.get(extra.id) || 0;
+                        return (
+                          <div key={extra.id} className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1">
+                            <span className="text-xs font-medium text-gray-700">{extra.nombre} (${extra.precio})</span>
+                            {cant > 0 ? (
+                              <>
+                                <button
+                                  onClick={() => updateExtraSueltoCantidad(extra.id, -1, true)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="text-xs font-semibold w-5 text-center">{cant}</span>
+                                <button
+                                  onClick={() => updateExtraSueltoCantidad(extra.id, 1, true)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => updateExtraSueltoCantidad(extra.id, 1, true)}
+                                className="h-6 w-6 rounded border border-green-300 bg-green-50 flex items-center justify-center hover:bg-green-100"
+                              >
+                                <Plus className="h-3 w-3 text-green-600" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
               {editItems.length === 0 && editPromos.length === 0 && (
                 <div className="px-6 py-8 text-center text-sm text-gray-400">
                   Sin ítems. Agrega al menos uno para guardar.
@@ -1125,6 +1245,18 @@ export default function PedidoDetailPage() {
                       <p className="text-xs text-purple-500">{pp.promocion_tipo_display} · ×{pp.cantidad}</p>
                     </div>
                     <span className="text-sm font-semibold text-gray-900">${pp.subtotal}</span>
+                  </div>
+                ))}
+
+              {/* Existing extras sueltos — read-only */}
+              {pedido.extras_sueltos && pedido.extras_sueltos.length > 0 &&
+                pedido.extras_sueltos.map((es) => (
+                  <div key={`es-${es.id}`} className="px-6 py-4 flex items-center justify-between opacity-60">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{es.extra_nombre}</p>
+                      <p className="text-xs text-green-600">Extra suelto · ×{es.cantidad}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">${es.subtotal}</span>
                   </div>
                 ))}
 
@@ -1316,8 +1448,54 @@ export default function PedidoDetailPage() {
                 </>
               )}
 
+              {/* New extras sueltos in add-items mode */}
+              {allExtras.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-green-50 flex items-center gap-2">
+                    <Plus className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-xs font-semibold text-green-700 uppercase">Nuevos Extras sueltos</span>
+                  </div>
+                  <div className="px-6 py-4 bg-emerald-50/30">
+                    <div className="flex flex-wrap gap-2">
+                      {allExtras.map((extra) => {
+                        const cant = newExtrasSueltos.get(extra.id) || 0;
+                        return (
+                          <div key={extra.id} className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1">
+                            <span className="text-xs font-medium text-gray-700">{extra.nombre} (${extra.precio})</span>
+                            {cant > 0 ? (
+                              <>
+                                <button
+                                  onClick={() => updateExtraSueltoCantidad(extra.id, -1, false)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="text-xs font-semibold w-5 text-center">{cant}</span>
+                                <button
+                                  onClick={() => updateExtraSueltoCantidad(extra.id, 1, false)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => updateExtraSueltoCantidad(extra.id, 1, false)}
+                                className="h-6 w-6 rounded border border-green-300 bg-green-50 flex items-center justify-center hover:bg-green-100"
+                              >
+                                <Plus className="h-3 w-3 text-green-600" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* New items total */}
-              {(newItems.length > 0 || newPromos.length > 0) && (
+              {(newItems.length > 0 || newPromos.length > 0 || newExtrasSueltos.size > 0) && (
                 <div className="px-6 py-3 bg-emerald-50 flex justify-between items-center">
                   <span className="text-xs font-semibold text-emerald-700">Subtotal adición</span>
                   <span className="text-sm font-bold text-emerald-700">${newItemsTotal.toFixed(2)}</span>
