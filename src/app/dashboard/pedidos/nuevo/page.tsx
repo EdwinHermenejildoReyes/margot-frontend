@@ -909,13 +909,13 @@ export default function NuevoPedidoPage() {
                 >
                   <option value="">Seleccionar mesa...</option>
                   {mesas
-                    .filter((m) => m.estado === "ocupada" || m.estado === "disponible")
+                    .filter((m) => m.estado === "disponible" || m.estado === "ocupada")
                     .sort((a, b) => a.numero - b.numero)
                     .map((m) => {
                       const atencion = getAtencionForMesa(m.id);
                       return (
                         <option key={m.id} value={m.id}>
-                          Mesa {m.numero} ({m.capacidad} pers.) — {m.estado}
+                          Mesa {m.numero} ({m.capacidad} pers.) — {m.estado === "disponible" ? "🟢 Libre" : "🟡 Ocupada"}
                           {atencion ? ` — Atención ${atencion.numero_atencion}` : ""}
                         </option>
                       );
@@ -923,11 +923,24 @@ export default function NuevoPedidoPage() {
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
-              {mesaId && atencionId && (
-                <p className="text-xs text-brand-bronze mt-1">
-                  Vinculado a atención #{atenciones.find((a) => a.id === atencionId)?.numero_atencion}
-                </p>
-              )}
+              {mesaId && (() => {
+                const mesa = mesas.find((m) => m.id === mesaId);
+                if (mesa?.estado === "disponible" && !atencionId) {
+                  return (
+                    <p className="text-xs text-emerald-600 mt-1">
+                      ✓ Mesa libre — se asignará automáticamente al crear el pedido.
+                    </p>
+                  );
+                }
+                if (atencionId) {
+                  return (
+                    <p className="text-xs text-brand-bronze mt-1">
+                      Vinculado a atención #{atenciones.find((a) => a.id === atencionId)?.numero_atencion}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
 

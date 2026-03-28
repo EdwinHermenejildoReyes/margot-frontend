@@ -24,6 +24,8 @@ import {
   StickyNote,
   Sparkles,
   Package,
+  Banknote,
+  ArrowRightLeft,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StockInsuficienteModal, {
@@ -158,6 +160,9 @@ export default function PedidoDetailPage() {
 
   /* add-item modal */
   const [showAddModal, setShowAddModal] = useState(false);
+
+  /* payment modal for entregar */
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [allPromos, setAllPromos] = useState<Promocion[]>([]);
@@ -199,9 +204,9 @@ export default function PedidoDetailPage() {
   }, [params.id, editing, addingItems]);
 
   /* ── Actions ── */
-  const handleAction = async (action: string) => {
+  const handleAction = async (action: string, extraData?: Record<string, string>) => {
     try {
-      await api.post(`/pedidos/${params.id}/${action}/`);
+      await api.post(`/pedidos/${params.id}/${action}/`, extraData || {});
       toast.success(`Pedido ${action} exitosamente`);
       fetchPedido();
     } catch (err: unknown) {
@@ -216,6 +221,21 @@ export default function PedidoDetailPage() {
         toast.error(`Error al ${action} el pedido`);
       }
     }
+  };
+
+  const handleEntregar = () => {
+    const hasPago = pedido?.pagos && pedido.pagos.some((p) => p.estado === "completado");
+    if (hasPago || pedido?.atencion) {
+      // Already has payment or is linked to an atencion (payment handled on liberar)
+      handleAction("entregar");
+    } else {
+      setShowPaymentModal(true);
+    }
+  };
+
+  const handleConfirmEntregar = (metodoPago: string) => {
+    setShowPaymentModal(false);
+    handleAction("entregar", { metodo_pago: metodoPago });
   };
 
   /* ── Edit mode helpers ── */
@@ -901,7 +921,7 @@ export default function PedidoDetailPage() {
                 {/* Mesero/Cajero/Admin: Entregar pedido listo */}
                 {pedido?.estado === "listo" && (isAdmin || isMeseroCajero) && (
                   <button
-                    onClick={() => handleAction("entregar")}
+                    onClick={handleEntregar}
                     className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 transition-colors"
                   >
                     🍽️ Entregar
@@ -1984,6 +2004,47 @@ export default function PedidoDetailPage() {
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ PAYMENT METHOD MODAL (on entregar) ═══ */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Método de Pago</h2>
+              <button onClick={() => setShowPaymentModal(false)} className="p-2 rounded-lg hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-gray-500 mb-4">Selecciona cómo pagó el cliente antes de entregar el pedido.</p>
+              <button
+                onClick={() => handleConfirmEntregar("efectivo")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-green-200 bg-green-50 text-green-800 font-medium hover:border-green-400 transition-colors"
+              >
+                <Banknote className="h-5 w-5" /> Efectivo
+              </button>
+              <button
+                onClick={() => handleConfirmEntregar("transferencia")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-blue-200 bg-blue-50 text-blue-800 font-medium hover:border-blue-400 transition-colors"
+              >
+                <ArrowRightLeft className="h-5 w-5" /> Transferencia
+              </button>
+              <button
+                onClick={() => handleConfirmEntregar("tarjeta")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-purple-200 bg-purple-50 text-purple-800 font-medium hover:border-purple-400 transition-colors"
+              >
+                <CreditCard className="h-5 w-5" /> Tarjeta
+              </button>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="w-full py-2.5 px-4 rounded-lg border text-sm font-medium text-gray-600 hover:bg-gray-50 mt-2"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
