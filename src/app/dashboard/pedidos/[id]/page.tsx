@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { MenuItem, Category, PaginatedResponse, Promocion, ExtraSeleccionado, Extra } from "@/lib/types";
+import type { MenuItem, Category, PaginatedResponse, Promocion, ExtraSeleccionado, Extra, TipoEmpaque } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import clsx from "clsx";
@@ -23,6 +23,7 @@ import {
   UtensilsCrossed,
   StickyNote,
   Sparkles,
+  Package,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StockInsuficienteModal, {
@@ -83,6 +84,15 @@ interface PedidoDetail {
     precio_unitario: string;
     subtotal: string;
   }>;
+  empaques?: Array<{
+    id: number;
+    tipo_empaque: number;
+    tipo_empaque_nombre: string;
+    cantidad: number;
+    precio_unitario: string;
+    subtotal: string;
+  }>;
+  costo_empaques?: string;
   pagos: Array<{
     id: number;
     metodo_pago: string;
@@ -135,6 +145,7 @@ export default function PedidoDetailPage() {
   const [editItems, setEditItems] = useState<EditItem[]>([]);
   const [editPromos, setEditPromos] = useState<EditPromo[]>([]);
   const [editExtrasSueltos, setEditExtrasSueltos] = useState<Map<number, number>>(new Map());
+  const [editEmpaques, setEditEmpaques] = useState<Map<number, number>>(new Map());
   const [editNotas, setEditNotas] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -159,6 +170,7 @@ export default function PedidoDetailPage() {
   const [stockAction, setStockAction] = useState<"confirmar" | "preparar">("confirmar");
   const [selectionPromo, setSelectionPromo] = useState<Promocion | null>(null);
   const [selectionIsAddingItems, setSelectionIsAddingItems] = useState(false);
+  const [allTiposEmpaque, setAllTiposEmpaque] = useState<TipoEmpaque[]>([]);
 
   /* ── Fetch pedido ── */
   const fetchPedido = async () => {
@@ -209,13 +221,23 @@ export default function PedidoDetailPage() {
   /* ── Edit mode helpers ── */
   const startEditing = async () => {
     if (!pedido) return;
-    // Fetch extras if not already loaded
+    // Fetch extras and tipos empaque if not already loaded
+    const fetches: Promise<void>[] = [];
     if (allExtras.length === 0) {
-      try {
-        const res = await api.get<PaginatedResponse<Extra>>("/extras/?page_size=100");
-        setAllExtras(res.data.results || []);
-      } catch { /* ignore */ }
+      fetches.push(
+        api.get<PaginatedResponse<Extra>>("/extras/?page_size=100")
+          .then((res) => setAllExtras(res.data.results || []))
+          .catch(() => {})
+      );
     }
+    if (allTiposEmpaque.length === 0) {
+      fetches.push(
+        api.get<PaginatedResponse<TipoEmpaque>>("/tipos-empaque/?page_size=50")
+          .then((res) => setAllTiposEmpaque(res.data.results || []))
+          .catch(() => {})
+      );
+    }
+    if (fetches.length > 0) await Promise.all(fetches);
     setEditItems(
       pedido.detalles.map((d) => {
         const mi = menuItems.find((m) => m.id === d.menu_item);
@@ -247,6 +269,10 @@ export default function PedidoDetailPage() {
     const esMap = new Map<number, number>();
     (pedido.extras_sueltos || []).forEach((es) => esMap.set(es.extra, es.cantidad));
     setEditExtrasSueltos(esMap);
+    // Load existing empaques
+    const empMap = new Map<number, number>();
+    (pedido.empaques || []).forEach((emp) => empMap.set(emp.tipo_empaque, emp.cantidad));
+    setEditEmpaques(empMap);
     setEditing(true);
   };
 
@@ -255,6 +281,7 @@ export default function PedidoDetailPage() {
     setEditItems([]);
     setEditPromos([]);
     setEditExtrasSueltos(new Map());
+    setEditEmpaques(new Map());
     setShowAddModal(false);
   };
 
@@ -460,6 +487,17 @@ export default function PedidoDetailPage() {
     });
   };
 
+  const updateEmpaqueCantidad = (tipoId: number, delta: number) => {
+    setEditEmpaques((prev) => {
+      const next = new Map(prev);
+      const current = next.get(tipoId) || 0;
+      const newVal = Math.max(0, current + delta);
+      if (newVal === 0) next.delete(tipoId);
+      else next.set(tipoId, newVal);
+      return next;
+    });
+  };
+
   const saveNewItems = async () => {
     if (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0) {
       toast.error("Debes agregar al menos un ítem, promoción o extra");
@@ -630,8 +668,12 @@ export default function PedidoDetailPage() {
       Array.from(editExtrasSueltos.entries()).reduce((sum, [extraId, cant]) => {
         const extra = allExtras.find((e) => e.id === extraId);
         return sum + (extra ? parseFloat(extra.precio) * cant : 0);
+      }, 0) +
+      Array.from(editEmpaques.entries()).reduce((sum, [tipoId, cant]) => {
+        const tipo = allTiposEmpaque.find((t) => t.id === tipoId);
+        return sum + (tipo ? parseFloat(tipo.precio) * cant : 0);
       }, 0),
-    [editItems, editPromos, editExtrasSueltos, allExtras]
+    [editItems, editPromos, editExtrasSueltos, allExtras, editEmpaques, allTiposEmpaque]
   );
 
   /* ── Save edits ── */
@@ -663,6 +705,9 @@ export default function PedidoDetailPage() {
         extras_sueltos: Array.from(editExtrasSueltos.entries())
           .filter(([, cant]) => cant > 0)
           .map(([extraId, cant]) => ({ extra: extraId, cantidad: cant })),
+        empaques: Array.from(editEmpaques.entries())
+          .filter(([, cant]) => cant > 0)
+          .map(([tipoId, cant]) => ({ tipo_empaque: tipoId, cantidad: cant })),
       });
       setPedido(data);
       setEditing(false);
@@ -680,16 +725,18 @@ export default function PedidoDetailPage() {
     if (menuItems.length === 0) {
       setMenuLoading(true);
       try {
-        const [menuRes, catRes, promosRes, extrasRes] = await Promise.all([
+        const [menuRes, catRes, promosRes, extrasRes, empaquesRes] = await Promise.all([
           api.get<PaginatedResponse<MenuItem>>("/menu-items/?page_size=200&is_available=true"),
           api.get<PaginatedResponse<Category>>("/categorias/?page_size=50"),
           api.get("/promociones/vigentes/"),
           api.get<PaginatedResponse<Extra>>("/extras/?page_size=100"),
+          api.get<PaginatedResponse<TipoEmpaque>>("/tipos-empaque/?page_size=50"),
         ]);
         setMenuItems(menuRes.data.results || []);
         setCategories(catRes.data.results || []);
         setAllPromos(Array.isArray(promosRes.data) ? promosRes.data : promosRes.data.results || []);
         setAllExtras(extrasRes.data.results || []);
+        setAllTiposEmpaque(empaquesRes.data.results || []);
       } catch {
         toast.error("Error al cargar el menú");
       } finally {
@@ -960,6 +1007,26 @@ export default function PedidoDetailPage() {
                   ))}
                 </>
               )}
+              {/* Empaques in view mode */}
+              {pedido.empaques && pedido.empaques.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-amber-50 flex items-center gap-2">
+                    <Package className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-xs font-semibold text-amber-700 uppercase">Empaques</span>
+                  </div>
+                  {pedido.empaques.map((emp) => (
+                    <div key={`emp-${emp.id}`} className="px-6 py-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{emp.tipo_empaque_nombre}</p>
+                        <p className="text-xs text-amber-600">
+                          Cantidad: {emp.cantidad} × ${emp.precio_unitario}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">${emp.subtotal}</span>
+                    </div>
+                  ))}
+                </>
+              )}
               {(!pedido.detalles || pedido.detalles.length === 0) && (!pedido.promociones || pedido.promociones.length === 0) && (!pedido.extras_sueltos || pedido.extras_sueltos.length === 0) && (
                 <div className="px-6 py-8 text-center text-sm text-gray-400">Sin ítems</div>
               )}
@@ -1203,6 +1270,52 @@ export default function PedidoDetailPage() {
                 </>
               )}
 
+              {/* Empaques in edit mode (para llevar / delivery) */}
+              {pedido.tipo_entrega !== "local" && allTiposEmpaque.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-amber-50 flex items-center gap-2">
+                    <Package className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-xs font-semibold text-amber-700 uppercase">Empaques</span>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {allTiposEmpaque.map((tipo) => {
+                        const cant = editEmpaques.get(tipo.id) || 0;
+                        return (
+                          <div key={tipo.id} className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1">
+                            <span className="text-xs font-medium text-gray-700">{tipo.nombre} (${tipo.precio})</span>
+                            {cant > 0 ? (
+                              <>
+                                <button
+                                  onClick={() => updateEmpaqueCantidad(tipo.id, -1)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="text-xs font-semibold w-5 text-center">{cant}</span>
+                                <button
+                                  onClick={() => updateEmpaqueCantidad(tipo.id, 1)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => updateEmpaqueCantidad(tipo.id, 1)}
+                                className="h-6 w-6 rounded border border-amber-300 bg-amber-50 flex items-center justify-center hover:bg-amber-100"
+                              >
+                                <Plus className="h-3 w-3 text-amber-600" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
               {editItems.length === 0 && editPromos.length === 0 && (
                 <div className="px-6 py-8 text-center text-sm text-gray-400">
                   Sin ítems. Agrega al menos uno para guardar.
@@ -1214,7 +1327,6 @@ export default function PedidoDetailPage() {
           {/* ── Adding-items mode: existing items (read-only) + new items ── */}
           {addingItems && (
             <div className="divide-y divide-gray-100">
-              {/* Existing items — read-only */}
               {pedido.detalles?.map((det) => (
                 <div key={det.id} className="px-6 py-4 flex items-center justify-between opacity-60">
                   <div>
@@ -1257,6 +1369,18 @@ export default function PedidoDetailPage() {
                       <p className="text-xs text-green-600">Extra suelto · ×{es.cantidad}</p>
                     </div>
                     <span className="text-sm font-semibold text-gray-900">${es.subtotal}</span>
+                  </div>
+                ))}
+
+              {/* Existing empaques — read-only */}
+              {pedido.empaques && pedido.empaques.length > 0 &&
+                pedido.empaques.map((emp) => (
+                  <div key={`emp-${emp.id}`} className="px-6 py-4 flex items-center justify-between opacity-60">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{emp.tipo_empaque_nombre}</p>
+                      <p className="text-xs text-amber-600">Empaque · ×{emp.cantidad}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">${emp.subtotal}</span>
                   </div>
                 ))}
 
@@ -1519,6 +1643,12 @@ export default function PedidoDetailPage() {
               </div>
               {!editing && (
                 <>
+                  {pedido.costo_empaques && parseFloat(pedido.costo_empaques) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Empaques</span>
+                      <span className="text-gray-900">${pedido.costo_empaques}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Impuestos</span>
                     <span className="text-gray-900">${pedido.impuestos}</span>
