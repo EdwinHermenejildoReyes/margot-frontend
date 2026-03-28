@@ -30,6 +30,7 @@ export default function MesasPage() {
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [liberando, setLiberando] = useState<number | null>(null);
   const [liberarModal, setLiberarModal] = useState<number | null>(null);
+  const [liberarPedidos, setLiberarPedidos] = useState<Pedido[]>([]);
 
   const fetchMesas = async () => {
     try {
@@ -100,7 +101,16 @@ export default function MesasPage() {
     setShowAtencionModal(true);
   };
 
-  const handleLiberar = (atencionId: number) => {
+  const handleLiberar = async (atencionId: number) => {
+    try {
+      const { data } = await api.get<PaginatedResponse<Pedido>>(
+        `/pedidos/?atencion=${atencionId}&ordering=-created_at`
+      );
+      const pedidos = (data.results || []).filter((p) => p.estado !== "cancelado");
+      setLiberarPedidos(pedidos);
+    } catch {
+      setLiberarPedidos([]);
+    }
     setLiberarModal(atencionId);
   };
 
@@ -108,6 +118,7 @@ export default function MesasPage() {
     if (!liberarModal) return;
     setLiberando(liberarModal);
     setLiberarModal(null);
+    setLiberarPedidos([]);
     try {
       await api.post(`/atenciones/${liberarModal}/liberar/`, { metodo_pago: metodoPago });
       toast.success("Mesa liberada");
@@ -268,43 +279,75 @@ export default function MesasPage() {
       )}
 
       {/* Liberar Mesa - Payment Method Modal */}
-      {liberarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Método de Pago</h2>
-              <button onClick={() => setLiberarModal(null)} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="p-6 space-y-3">
-              <p className="text-sm text-gray-500 mb-4">Selecciona cómo pagó el cliente para liberar la mesa.</p>
-              <button
-                onClick={() => handleConfirmLiberar("efectivo")}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-green-200 bg-green-50 text-green-800 font-medium hover:border-green-400 transition-colors"
-              >
-                <Banknote className="h-5 w-5" /> Efectivo
-              </button>
-              <button
-                onClick={() => handleConfirmLiberar("transferencia")}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-blue-200 bg-blue-50 text-blue-800 font-medium hover:border-blue-400 transition-colors"
-              >
-                <ArrowRightLeft className="h-5 w-5" /> Transferencia
-              </button>
-              <button
-                onClick={() => handleConfirmLiberar("tarjeta")}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-purple-200 bg-purple-50 text-purple-800 font-medium hover:border-purple-400 transition-colors"
-              >
-                <CreditCard className="h-5 w-5" /> Tarjeta
-              </button>
-              <button
-                onClick={() => setLiberarModal(null)}
-                className="w-full py-2.5 px-4 rounded-lg border text-sm font-medium text-gray-600 hover:bg-gray-50 mt-2"
-              >
-                Cancelar
-              </button>
+      {liberarModal && (() => {
+        const atencion = atenciones.find((a) => a.id === liberarModal);
+        const mesaNum = atencion?.mesa_numero || atencion?.mesa;
+        const totalGlobal = liberarPedidos.reduce((sum, p) => sum + parseFloat(p.total || "0"), 0);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white rounded-2xl w-full max-w-md">
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Cuenta — Mesa {mesaNum}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{liberarPedidos.length} pedido{liberarPedidos.length !== 1 ? "s" : ""}</p>
+                </div>
+                <button onClick={() => { setLiberarModal(null); setLiberarPedidos([]); }} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
+              </div>
+
+              {/* Resumen de pedidos */}
+              {liberarPedidos.length > 0 && (
+                <div className="px-6 pt-4 pb-2">
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                    {liberarPedidos.map((ped) => (
+                      <div key={ped.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-700">
+                            {ped.numero_pedido.slice(-4)}
+                          </span>
+                          <StatusBadge status={ped.estado} />
+                        </div>
+                        <span className="font-semibold text-gray-900">${parseFloat(ped.total || "0").toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between items-center">
+                      <span className="text-sm font-bold text-gray-900">Total a pagar</span>
+                      <span className="text-lg font-bold text-brand-gold">${totalGlobal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-6 pt-3 space-y-3">
+                <p className="text-sm text-gray-500 mb-2">Selecciona el método de pago para liberar la mesa.</p>
+                <button
+                  onClick={() => handleConfirmLiberar("efectivo")}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-green-200 bg-green-50 text-green-800 font-medium hover:border-green-400 transition-colors"
+                >
+                  <Banknote className="h-5 w-5" /> Efectivo
+                </button>
+                <button
+                  onClick={() => handleConfirmLiberar("transferencia")}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-blue-200 bg-blue-50 text-blue-800 font-medium hover:border-blue-400 transition-colors"
+                >
+                  <ArrowRightLeft className="h-5 w-5" /> Transferencia
+                </button>
+                <button
+                  onClick={() => handleConfirmLiberar("tarjeta")}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-purple-200 bg-purple-50 text-purple-800 font-medium hover:border-purple-400 transition-colors"
+                >
+                  <CreditCard className="h-5 w-5" /> Tarjeta
+                </button>
+                <button
+                  onClick={() => { setLiberarModal(null); setLiberarPedidos([]); }}
+                  className="w-full py-2.5 px-4 rounded-lg border text-sm font-medium text-gray-600 hover:bg-gray-50 mt-2"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* New Atencion Modal */}
       {showAtencionModal && selectedMesa && (
