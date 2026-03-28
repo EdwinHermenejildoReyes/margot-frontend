@@ -83,6 +83,7 @@ export default function AsistenciaPage() {
   const [equipo, setEquipo] = useState<ResumenEmpleado[]>([]);
   const [mesEquipo, setMesEquipo] = useState(new Date().getMonth() + 1);
   const [anioEquipo, setAnioEquipo] = useState(new Date().getFullYear());
+  const [tarifasEquipo, setTarifasEquipo] = useState<Record<string, number>>({});
 
   // Config local
   const [configLocal, setConfigLocal] = useState<ConfiguracionLocal | null>(null);
@@ -92,6 +93,8 @@ export default function AsistenciaPage() {
     longitud: "",
     radio_metros: 100,
     direccion: "",
+    tarifa_hora: 0,
+    tarifas_hora: {} as Record<string, number>,
   });
   const [configSaving, setConfigSaving] = useState(false);
 
@@ -268,6 +271,7 @@ export default function AsistenciaPage() {
         `/asistencia/resumen_equipo/?mes=${mesEquipo}&anio=${anioEquipo}`
       );
       setEquipo(data.equipo);
+      setTarifasEquipo(data.tarifas_hora ?? {});
     } catch {
       /* ignore */
     }
@@ -290,6 +294,8 @@ export default function AsistenciaPage() {
           longitud: String(cfg.longitud),
           radio_metros: cfg.radio_metros,
           direccion: cfg.direccion || "",
+          tarifa_hora: 0,
+          tarifas_hora: cfg.tarifas_hora || {},
         });
       }
     } catch {
@@ -310,6 +316,7 @@ export default function AsistenciaPage() {
         longitud: configForm.longitud,
         radio_metros: configForm.radio_metros,
         direccion: configForm.direccion,
+        tarifas_hora: configForm.tarifas_hora,
       };
       if (configLocal) {
         await api.put(`/configuracion-local/${configLocal.id}/`, payload);
@@ -546,7 +553,7 @@ export default function AsistenciaPage() {
 
           {/* Summary cards */}
           {resumen && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center border border-gray-200">
                 <p className="text-2xl sm:text-3xl font-bold text-brand-gold">
                   {resumen.total_horas}h
@@ -559,6 +566,22 @@ export default function AsistenciaPage() {
                 </p>
                 <p className="text-gray-500 text-xs sm:text-sm mt-1">Días trabajados</p>
               </div>
+              {resumen.tarifa_hora > 0 && (
+                <>
+                  <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center border border-gray-200">
+                    <p className="text-2xl sm:text-3xl font-bold text-emerald-600">
+                      ${resumen.tarifa_hora}
+                    </p>
+                    <p className="text-gray-500 text-xs sm:text-sm mt-1">Tarifa/hora</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-xl p-3 sm:p-4 text-center border border-emerald-200">
+                    <p className="text-2xl sm:text-3xl font-bold text-emerald-600">
+                      ${resumen.valor_horas.toFixed(2)}
+                    </p>
+                    <p className="text-emerald-700 text-xs sm:text-sm mt-1">Valor acumulado</p>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -688,12 +711,15 @@ export default function AsistenciaPage() {
                     <th className="text-left px-4 py-3">Cargo</th>
                     <th className="text-right px-4 py-3">Días</th>
                     <th className="text-right px-4 py-3">Horas</th>
+                    {Object.values(tarifasEquipo).some(v => v > 0) && (
+                      <th className="text-right px-4 py-3">Valor</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {equipo.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="text-center text-gray-500 py-8">Sin datos este mes</td>
+                      <td colSpan={Object.values(tarifasEquipo).some(v => v > 0) ? 5 : 4} className="text-center text-gray-500 py-8">Sin datos este mes</td>
                     </tr>
                   )}
                   {equipo.map((e) => (
@@ -702,6 +728,11 @@ export default function AsistenciaPage() {
                       <td className="px-4 py-3 text-gray-500 capitalize">{e.tipo_usuario}</td>
                       <td className="px-4 py-3 text-right text-gray-600">{e.dias_trabajados}</td>
                       <td className="px-4 py-3 text-right text-brand-gold font-bold font-mono">{e.total_horas}h</td>
+                      {Object.values(tarifasEquipo).some(v => v > 0) && (
+                        <td className="px-4 py-3 text-right text-emerald-600 font-bold font-mono">
+                          ${e.valor_horas.toFixed(2)}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -712,6 +743,11 @@ export default function AsistenciaPage() {
                       <td className="px-4 py-3 text-right text-brand-gold font-bold font-mono">
                         {equipo.reduce((s, e) => s + e.total_horas, 0).toFixed(2)}h
                       </td>
+                      {Object.values(tarifasEquipo).some(v => v > 0) && (
+                        <td className="px-4 py-3 text-right text-emerald-600 font-bold font-mono">
+                          ${equipo.reduce((s, e) => s + e.valor_horas, 0).toFixed(2)}
+                        </td>
+                      )}
                     </tr>
                   </tfoot>
                 )}
@@ -740,6 +776,12 @@ export default function AsistenciaPage() {
                       <p className="text-sm font-bold text-brand-gold font-mono">{e.total_horas}h</p>
                       <p className="text-[10px] text-gray-400">horas</p>
                     </div>
+                    {e.valor_horas > 0 && (
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-emerald-600 font-mono">${e.valor_horas.toFixed(2)}</p>
+                        <p className="text-[10px] text-gray-400">valor</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -747,9 +789,16 @@ export default function AsistenciaPage() {
             {equipo.length > 0 && (
               <div className="bg-gray-50 rounded-xl border border-gray-200 p-3 flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-900">Total equipo</span>
-                <span className="text-sm font-bold text-brand-gold font-mono">
-                  {equipo.reduce((s, e) => s + e.total_horas, 0).toFixed(2)}h
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-brand-gold font-mono">
+                    {equipo.reduce((s, e) => s + e.total_horas, 0).toFixed(2)}h
+                  </span>
+                  {equipo.some(e => e.valor_horas > 0) && (
+                    <span className="text-sm font-bold text-emerald-600 font-mono">
+                      ${equipo.reduce((s, e) => s + e.valor_horas, 0).toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -844,6 +893,45 @@ export default function AsistenciaPage() {
               <p className="text-xs text-gray-400 mt-1">
                 Los empleados deben estar dentro de este radio para registrar
                 asistencia.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-2">
+                Tarifas por hora ($)
+              </label>
+              <div className="space-y-2">
+                {[
+                  { key: 'cocinero', label: 'Cocinero' },
+                  { key: 'barman', label: 'Barman' },
+                  { key: 'cajero', label: 'Cajero' },
+                  { key: 'mesero', label: 'Mesero' },
+                  { key: 'comercio', label: 'Administrador' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600 w-28">{label}</span>
+                    <input
+                      type="number"
+                      value={configForm.tarifas_hora[key] ?? 0}
+                      onChange={(e) =>
+                        setConfigForm((f) => ({
+                          ...f,
+                          tarifas_hora: {
+                            ...f.tarifas_hora,
+                            [key]: parseFloat(e.target.value) || 0,
+                          },
+                        }))
+                      }
+                      className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50 text-sm"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Configura el valor por hora según el cargo del empleado.
               </p>
             </div>
 

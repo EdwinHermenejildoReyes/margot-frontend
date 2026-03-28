@@ -430,6 +430,7 @@ export interface ConfiguracionLocal {
   longitud: string;
   radio_metros: number;
   direccion: string;
+  tarifas_hora: Record<string, number>;
   created_at: string;
   updated_at: string;
 }
@@ -462,6 +463,8 @@ export interface ResumenMensual {
   anio: number;
   total_horas: number;
   dias_trabajados: number;
+  tarifa_hora: number;
+  valor_horas: number;
   registros: RegistroAsistencia[];
 }
 
@@ -471,11 +474,14 @@ export interface ResumenEmpleado {
   tipo_usuario: string;
   total_horas: number;
   dias_trabajados: number;
+  tarifa_hora: number;
+  valor_horas: number;
 }
 
 export interface ResumenEquipo {
   mes: number;
   anio: number;
+  tarifas_hora: Record<string, number>;
   equipo: ResumenEmpleado[];
 }
 
