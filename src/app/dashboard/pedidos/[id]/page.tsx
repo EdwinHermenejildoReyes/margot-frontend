@@ -26,6 +26,7 @@ import {
   Package,
   Banknote,
   ArrowRightLeft,
+  Tag,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import StockInsuficienteModal, {
@@ -95,6 +96,13 @@ interface PedidoDetail {
     subtotal: string;
   }>;
   costo_empaques?: string;
+  codigo_descuento?: number;
+  codigo_descuento_info?: {
+    codigo: string;
+    tipo: string;
+    nombre_titular: string;
+    porcentaje: string;
+  };
   pagos: Array<{
     id: number;
     metodo_pago: string;
@@ -149,6 +157,17 @@ export default function PedidoDetailPage() {
   const [editExtrasSueltos, setEditExtrasSueltos] = useState<Map<number, number>>(new Map());
   const [editEmpaques, setEditEmpaques] = useState<Map<number, number>>(new Map());
   const [editNotas, setEditNotas] = useState("");
+  const [editCodigoInput, setEditCodigoInput] = useState("");
+  const [editCodigoDescuento, setEditCodigoDescuento] = useState<{
+    codigo_id: number;
+    tipo: string;
+    nombre_titular: string;
+    porcentaje: string;
+    subtotal_aplicable: string;
+    monto_descuento: string;
+    secciones: string[];
+  } | null>(null);
+  const [validandoEditCodigo, setValidandoEditCodigo] = useState(false);
   const [saving, setSaving] = useState(false);
 
   /* add-items mode (for orders in preparation / confirmado / listo) */
@@ -156,6 +175,7 @@ export default function PedidoDetailPage() {
   const [newItems, setNewItems] = useState<EditItem[]>([]);
   const [newPromos, setNewPromos] = useState<EditPromo[]>([]);
   const [newExtrasSueltos, setNewExtrasSueltos] = useState<Map<number, number>>(new Map());
+  const [newEmpaques, setNewEmpaques] = useState<Map<number, number>>(new Map());
   const [savingNew, setSavingNew] = useState(false);
 
   /* add-item modal */
@@ -293,6 +313,21 @@ export default function PedidoDetailPage() {
     const empMap = new Map<number, number>();
     (pedido.empaques || []).forEach((emp) => empMap.set(emp.tipo_empaque, emp.cantidad));
     setEditEmpaques(empMap);
+    // Load existing discount code
+    if (pedido.codigo_descuento && pedido.codigo_descuento_info) {
+      setEditCodigoDescuento({
+        codigo_id: pedido.codigo_descuento,
+        tipo: pedido.codigo_descuento_info.tipo,
+        nombre_titular: pedido.codigo_descuento_info.nombre_titular,
+        porcentaje: pedido.codigo_descuento_info.porcentaje,
+        subtotal_aplicable: "0",
+        monto_descuento: pedido.descuento,
+        secciones: [],
+      });
+    } else {
+      setEditCodigoDescuento(null);
+    }
+    setEditCodigoInput("");
     setEditing(true);
   };
 
@@ -302,6 +337,8 @@ export default function PedidoDetailPage() {
     setEditPromos([]);
     setEditExtrasSueltos(new Map());
     setEditEmpaques(new Map());
+    setEditCodigoDescuento(null);
+    setEditCodigoInput("");
     setShowAddModal(false);
   };
 
@@ -310,7 +347,14 @@ export default function PedidoDetailPage() {
     setNewItems([]);
     setNewPromos([]);
     setNewExtrasSueltos(new Map());
+    setNewEmpaques(new Map());
     setAddingItems(true);
+    // Fetch tipos empaque if not already loaded
+    if (allTiposEmpaque.length === 0) {
+      api.get<PaginatedResponse<TipoEmpaque>>("/tipos-empaque/?page_size=50")
+        .then((res) => setAllTiposEmpaque(res.data.results || []))
+        .catch(() => {});
+    }
   };
 
   const cancelAddingItems = () => {
@@ -318,6 +362,7 @@ export default function PedidoDetailPage() {
     setNewItems([]);
     setNewPromos([]);
     setNewExtrasSueltos(new Map());
+    setNewEmpaques(new Map());
     setShowAddModal(false);
   };
 
@@ -495,6 +540,15 @@ export default function PedidoDetailPage() {
     [newItems, newPromos, newExtrasSueltos, allExtras]
   );
 
+  const newEmpaquesTotal = useMemo(
+    () =>
+      Array.from(newEmpaques.entries()).reduce((sum, [tipoId, cant]) => {
+        const tipo = allTiposEmpaque.find((t) => t.id === tipoId);
+        return sum + (tipo ? parseFloat(tipo.precio) * cant : 0);
+      }, 0),
+    [newEmpaques, allTiposEmpaque]
+  );
+
   const updateExtraSueltoCantidad = (extraId: number, delta: number, isEdit: boolean) => {
     const setter = isEdit ? setEditExtrasSueltos : setNewExtrasSueltos;
     setter((prev) => {
@@ -518,9 +572,20 @@ export default function PedidoDetailPage() {
     });
   };
 
+  const updateNewEmpaqueCantidad = (tipoId: number, delta: number) => {
+    setNewEmpaques((prev) => {
+      const next = new Map(prev);
+      const current = next.get(tipoId) || 0;
+      const newVal = Math.max(0, current + delta);
+      if (newVal === 0) next.delete(tipoId);
+      else next.set(tipoId, newVal);
+      return next;
+    });
+  };
+
   const saveNewItems = async () => {
-    if (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0) {
-      toast.error("Debes agregar al menos un ítem, promoción o extra");
+    if (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0 && newEmpaques.size === 0) {
+      toast.error("Debes agregar al menos un ítem, promoción, extra o empaque");
       return;
     }
     setSavingNew(true);
@@ -545,12 +610,16 @@ export default function PedidoDetailPage() {
         extras_sueltos: Array.from(newExtrasSueltos.entries())
           .filter(([, cant]) => cant > 0)
           .map(([extraId, cant]) => ({ extra: extraId, cantidad: cant })),
+        empaques: Array.from(newEmpaques.entries())
+          .filter(([, cant]) => cant > 0)
+          .map(([tipoId, cant]) => ({ tipo_empaque: tipoId, cantidad: cant })),
       });
       setPedido(data);
       setAddingItems(false);
       setNewItems([]);
       setNewPromos([]);
       setNewExtrasSueltos(new Map());
+      setNewEmpaques(new Map());
       toast.success("Ítems agregados — nueva comanda enviada a cocina ⚡");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: StockErrorResponse & { error?: string } } };
@@ -678,6 +747,35 @@ export default function PedidoDetailPage() {
     setEditPromos((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleValidarEditCodigo = async () => {
+    if (!editCodigoInput.trim()) return;
+    setValidandoEditCodigo(true);
+    try {
+      const { data } = await api.post("/codigos-descuento/validar/", {
+        codigo: editCodigoInput.trim(),
+        detalles: editItems.map((item) => ({
+          menu_item: item.menu_item_id,
+          cantidad: item.cantidad,
+        })),
+      });
+      if (data.valido) {
+        setEditCodigoDescuento(data);
+        toast.success(`Código aplicado: ${data.porcentaje}% — ${data.nombre_titular}`);
+      } else {
+        toast.error("Código no válido");
+      }
+    } catch {
+      toast.error("Código no válido o inactivo");
+    } finally {
+      setValidandoEditCodigo(false);
+    }
+  };
+
+  const handleRemoverEditCodigo = () => {
+    setEditCodigoDescuento(null);
+    setEditCodigoInput("");
+  };
+
   const editTotal = useMemo(
     () =>
       editItems.reduce((sum, item) => {
@@ -728,6 +826,7 @@ export default function PedidoDetailPage() {
         empaques: Array.from(editEmpaques.entries())
           .filter(([, cant]) => cant > 0)
           .map(([tipoId, cant]) => ({ tipo_empaque: tipoId, cantidad: cant })),
+        codigo_descuento: editCodigoDescuento ? editCodigoDescuento.codigo_id : null,
       });
       setPedido(data);
       setEditing(false);
@@ -863,7 +962,7 @@ export default function PedidoDetailPage() {
               </button>
               <button
                 onClick={saveNewItems}
-                disabled={savingNew || (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0)}
+                disabled={savingNew || (newItems.length === 0 && newPromos.length === 0 && newExtrasSueltos.size === 0 && newEmpaques.size === 0)}
                 className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-2"
               >
                 <Save className="h-4 w-4" />
@@ -1638,6 +1737,52 @@ export default function PedidoDetailPage() {
                 </>
               )}
 
+              {/* New empaques in add-items mode */}
+              {pedido.tipo_entrega !== 'local' && allTiposEmpaque.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-amber-50 flex items-center gap-2">
+                    <Package className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-xs font-semibold text-amber-700 uppercase">Empaques adicionales</span>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {allTiposEmpaque.map((tipo) => {
+                        const cant = newEmpaques.get(tipo.id) || 0;
+                        return (
+                          <div key={tipo.id} className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1">
+                            <span className="text-xs font-medium text-gray-700">{tipo.nombre} (${tipo.precio})</span>
+                            {cant > 0 ? (
+                              <>
+                                <button
+                                  onClick={() => updateNewEmpaqueCantidad(tipo.id, -1)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="text-xs font-semibold w-5 text-center">{cant}</span>
+                                <button
+                                  onClick={() => updateNewEmpaqueCantidad(tipo.id, 1)}
+                                  className="h-6 w-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => updateNewEmpaqueCantidad(tipo.id, 1)}
+                                className="h-6 w-6 rounded border border-amber-300 bg-amber-50 flex items-center justify-center hover:bg-amber-100"
+                              >
+                                <Plus className="h-3 w-3 text-amber-600" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* New items total */}
               {(newItems.length > 0 || newPromos.length > 0 || newExtrasSueltos.size > 0) && (
                 <div className="px-6 py-3 bg-emerald-50 flex justify-between items-center">
@@ -1666,7 +1811,15 @@ export default function PedidoDetailPage() {
                   {pedido.costo_empaques && parseFloat(pedido.costo_empaques) > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Empaques</span>
-                      <span className="text-gray-900">${pedido.costo_empaques}</span>
+                      <span className="text-gray-900">
+                        ${addingItems ? (parseFloat(pedido.costo_empaques) + newEmpaquesTotal).toFixed(2) : pedido.costo_empaques}
+                      </span>
+                    </div>
+                  )}
+                  {addingItems && newEmpaquesTotal > 0 && !(pedido.costo_empaques && parseFloat(pedido.costo_empaques) > 0) && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Empaques</span>
+                      <span className="text-gray-900">${newEmpaquesTotal.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
@@ -1679,10 +1832,70 @@ export default function PedidoDetailPage() {
                   </div>
                 </>
               )}
+              {editing && (
+                <>
+                  {editCodigoDescuento ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-green-700">
+                            {editCodigoDescuento.porcentaje}% — {editCodigoDescuento.nombre_titular}
+                          </p>
+                          <p className="text-[10px] text-green-600">
+                            {editCodigoDescuento.tipo === "socio" ? "Socio" : "Empleado"}
+                            {editCodigoDescuento.secciones && editCodigoDescuento.secciones.length > 0
+                              ? ` · Solo: ${editCodigoDescuento.secciones.join(", ")}`
+                              : " · Todo el menú"}
+                            {" · No aplica a promos"}
+                          </p>
+                          {parseFloat(editCodigoDescuento.monto_descuento) > 0 && (
+                            <p className="text-[10px] text-green-700 font-medium mt-0.5">
+                              Dcto: -${parseFloat(editCodigoDescuento.monto_descuento).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleRemoverEditCodigo}
+                          className="p-1 rounded hover:bg-green-100 text-green-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-medium text-gray-500 mb-1">
+                        <Tag className="h-3 w-3" /> Código de descuento
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Ej: SOCIO-001"
+                          value={editCodigoInput}
+                          onChange={(e) => setEditCodigoInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => e.key === "Enter" && handleValidarEditCodigo()}
+                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-brand-gold focus:outline-none uppercase"
+                        />
+                        <button
+                          onClick={handleValidarEditCodigo}
+                          disabled={validandoEditCodigo || !editCodigoInput.trim()}
+                          className="px-3 py-2 rounded-lg bg-brand-gold text-white text-xs font-medium hover:bg-brand-bronze disabled:opacity-50 transition-colors"
+                        >
+                          {validandoEditCodigo ? "..." : "Aplicar"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="border-t pt-3 flex justify-between font-semibold">
                 <span>Total</span>
                 <span className="text-brand-gold text-lg">
-                  ${editing ? editTotal.toFixed(2) : addingItems ? (parseFloat(pedido.total) + newItemsTotal).toFixed(2) : pedido.total}
+                  ${editing
+                    ? (editTotal - (editCodigoDescuento ? parseFloat(editCodigoDescuento.monto_descuento) : 0)).toFixed(2)
+                    : addingItems
+                      ? (parseFloat(pedido.total) + newItemsTotal + newEmpaquesTotal).toFixed(2)
+                      : pedido.total}
                 </span>
               </div>
             </div>
