@@ -96,6 +96,7 @@ interface PedidoDetail {
     subtotal: string;
   }>;
   costo_empaques?: string;
+  costo_delivery?: string;
   codigo_descuento?: number;
   codigo_descuento_info?: {
     codigo: string;
@@ -1820,6 +1821,12 @@ export default function PedidoDetailPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Empaques</span>
                       <span className="text-gray-900">${newEmpaquesTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {pedido.costo_delivery && parseFloat(pedido.costo_delivery) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Delivery</span>
+                      <span className="text-gray-900">${pedido.costo_delivery}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
