@@ -330,14 +330,24 @@ export default function NuevoPedidoPage() {
       setSelectionPromo(promo);
       return;
     }
+    // Auto-resolve selectedItem when there's exactly 1 aplica menu_item
+    const aplicaItems = promo.items?.filter((i) => i.rol === "aplica") || [];
+    const singleMenuItem = aplicaItems.length === 1 && aplicaItems[0].menu_item
+      ? menuItems.find((m) => m.id === aplicaItems[0].menu_item)
+      : undefined;
+
     setCartPromos((prev) => {
-      const existing = prev.find((p) => p.promocion.id === promo.id);
+      const existing = prev.find(
+        (p) => p.promocion.id === promo.id && p.selectedItem?.id === singleMenuItem?.id
+      );
       if (existing) {
         return prev.map((p) =>
-          p.promocion.id === promo.id ? { ...p, cantidad: p.cantidad + 1 } : p
+          p.promocion.id === promo.id && p.selectedItem?.id === singleMenuItem?.id
+            ? { ...p, cantidad: p.cantidad + 1 }
+            : p
         );
       }
-      return [...prev, { promocion: promo, cantidad: 1 }];
+      return [...prev, { promocion: promo, cantidad: 1, selectedItem: singleMenuItem }];
     });
   };
 
