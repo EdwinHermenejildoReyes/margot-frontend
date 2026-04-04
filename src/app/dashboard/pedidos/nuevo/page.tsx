@@ -314,8 +314,12 @@ export default function NuevoPedidoPage() {
     if (promo.tipo === "adicional") return true;
     if (promo.tipo === "nxm") {
       const aplicaItems = promo.items?.filter((i) => i.rol === "aplica") || [];
-      // Need selection if: no items loaded, any item uses category, or any item lacks a specific menu_item
-      if (aplicaItems.length === 0 || aplicaItems.some((i) => i.category || !i.menu_item)) return true;
+      // Need selection if: no items loaded, any item uses category,
+      // any item has precio_filtro (multiple products at that price), or no menu_item
+      if (
+        aplicaItems.length === 0 ||
+        aplicaItems.some((i) => i.category || !i.menu_item || i.precio_filtro)
+      ) return true;
     }
     return false;
   };
@@ -359,13 +363,24 @@ export default function NuevoPedidoPage() {
     const aplicaItems = selectionPromo.items.filter((i) => i.rol === "aplica");
     const categoryIds = aplicaItems.map((i) => i.category).filter(Boolean) as number[];
     const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
-    // Get precio_filtro if present (for NxM promos like "cócteles de $3")
     const precioFiltro = aplicaItems.find((i) => i.precio_filtro)?.precio_filtro;
+
+    // If there's a precio_filtro and a specific menu_item but no category,
+    // infer the category from that menu_item so all items at that price show up.
+    let inferredCategoryIds = [...categoryIds];
+    if (precioFiltro && inferredCategoryIds.length === 0 && specificItemIds.length > 0) {
+      for (const itemId of specificItemIds) {
+        const mi = menuItems.find((m) => m.id === itemId);
+        if (mi && !inferredCategoryIds.includes(mi.category)) {
+          inferredCategoryIds.push(mi.category);
+        }
+      }
+    }
+
     return menuItems.filter((mi) => {
-      const matchesCategory = categoryIds.includes(mi.category);
+      const matchesCategory = inferredCategoryIds.includes(mi.category);
       const matchesItem = specificItemIds.includes(mi.id);
       if (!matchesCategory && !matchesItem) return false;
-      // Apply price filter if present
       if (precioFiltro && parseFloat(mi.price) !== parseFloat(precioFiltro)) return false;
       return true;
     });
