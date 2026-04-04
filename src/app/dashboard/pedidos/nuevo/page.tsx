@@ -312,8 +312,11 @@ export default function NuevoPedidoPage() {
   /* ── Promo cart helpers ── */
   const promoNeedsSelection = (promo: Promocion) => {
     if (promo.tipo === "adicional") return true;
-    // NxM promos that reference a category (not specific menu_item) need selection
-    if (promo.tipo === "nxm" && promo.items?.some((i) => i.rol === "aplica" && i.category && !i.menu_item)) return true;
+    if (promo.tipo === "nxm") {
+      const aplicaItems = promo.items?.filter((i) => i.rol === "aplica") || [];
+      // Need selection if: no items loaded, any item uses category, or any item lacks a specific menu_item
+      if (aplicaItems.length === 0 || aplicaItems.some((i) => i.category || !i.menu_item)) return true;
+    }
     return false;
   };
 
