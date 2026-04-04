@@ -128,6 +128,7 @@ export interface PromocionItem {
   rol: "aplica" | "adicional";
   menu_item?: number;
   menu_item_nombre?: string;
+  menu_item_category?: number;
   category?: number;
   category_nombre?: string;
   cantidad: number;

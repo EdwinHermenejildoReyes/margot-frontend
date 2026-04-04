@@ -361,30 +361,39 @@ export default function NuevoPedidoPage() {
   const selectionTriggerItems = useMemo(() => {
     if (!selectionPromo) return [];
     const aplicaItems = (selectionPromo.items || []).filter((i) => i.rol === "aplica");
-    const categoryIds = aplicaItems.map((i) => i.category).filter(Boolean) as number[];
-    const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
     const precioFiltro = aplicaItems.find((i) => i.precio_filtro)?.precio_filtro;
 
-    // Infer category from menu_item when no category is set
-    const inferredCategoryIds = [...categoryIds];
-    if (precioFiltro && inferredCategoryIds.length === 0 && specificItemIds.length > 0) {
-      for (const itemId of specificItemIds) {
-        const mi = menuItems.find((m) => m.id === itemId);
-        if (mi && !inferredCategoryIds.includes(mi.category)) {
-          inferredCategoryIds.push(mi.category);
-        }
+    // Collect all possible category IDs: explicit category + menu_item_category from backend
+    const categoryIds = new Set<number>();
+    for (const item of aplicaItems) {
+      if (item.category) categoryIds.add(item.category);
+      if (item.menu_item_category) categoryIds.add(item.menu_item_category);
+    }
+    // Also try to infer from loaded menuItems if the referenced item is available
+    for (const item of aplicaItems) {
+      if (item.menu_item) {
+        const mi = menuItems.find((m) => m.id === item.menu_item);
+        if (mi) categoryIds.add(mi.category);
       }
     }
 
+    const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
+
+    // 1st try: category + precio_filtro
     let results = menuItems.filter((mi) => {
-      const matchesCategory = inferredCategoryIds.includes(mi.category);
+      const matchesCategory = categoryIds.has(mi.category);
       const matchesItem = specificItemIds.includes(mi.id);
       if (!matchesCategory && !matchesItem) return false;
       if (precioFiltro && parseFloat(mi.price) !== parseFloat(precioFiltro)) return false;
       return true;
     });
 
-    // Fallback: if no matches but we have precio_filtro, show ALL items at that price
+    // 2nd try: category only (ignore price filter)
+    if (results.length === 0 && categoryIds.size > 0) {
+      results = menuItems.filter((mi) => categoryIds.has(mi.category));
+    }
+
+    // 3rd try: all items at that exact price
     if (results.length === 0 && precioFiltro) {
       results = menuItems.filter((mi) => parseFloat(mi.price) === parseFloat(precioFiltro));
     }
