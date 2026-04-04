@@ -359,15 +359,14 @@ export default function NuevoPedidoPage() {
 
   // Items available for the promo selection modal
   const selectionTriggerItems = useMemo(() => {
-    if (!selectionPromo?.items) return [];
-    const aplicaItems = selectionPromo.items.filter((i) => i.rol === "aplica");
+    if (!selectionPromo) return [];
+    const aplicaItems = (selectionPromo.items || []).filter((i) => i.rol === "aplica");
     const categoryIds = aplicaItems.map((i) => i.category).filter(Boolean) as number[];
     const specificItemIds = aplicaItems.map((i) => i.menu_item).filter(Boolean) as number[];
     const precioFiltro = aplicaItems.find((i) => i.precio_filtro)?.precio_filtro;
 
-    // If there's a precio_filtro and a specific menu_item but no category,
-    // infer the category from that menu_item so all items at that price show up.
-    let inferredCategoryIds = [...categoryIds];
+    // Infer category from menu_item when no category is set
+    const inferredCategoryIds = [...categoryIds];
     if (precioFiltro && inferredCategoryIds.length === 0 && specificItemIds.length > 0) {
       for (const itemId of specificItemIds) {
         const mi = menuItems.find((m) => m.id === itemId);
@@ -377,13 +376,20 @@ export default function NuevoPedidoPage() {
       }
     }
 
-    return menuItems.filter((mi) => {
+    let results = menuItems.filter((mi) => {
       const matchesCategory = inferredCategoryIds.includes(mi.category);
       const matchesItem = specificItemIds.includes(mi.id);
       if (!matchesCategory && !matchesItem) return false;
       if (precioFiltro && parseFloat(mi.price) !== parseFloat(precioFiltro)) return false;
       return true;
     });
+
+    // Fallback: if no matches but we have precio_filtro, show ALL items at that price
+    if (results.length === 0 && precioFiltro) {
+      results = menuItems.filter((mi) => parseFloat(mi.price) === parseFloat(precioFiltro));
+    }
+
+    return results;
   }, [selectionPromo, menuItems]);
 
   const removePromoFromCart = (promoId: number, selectedItemId?: number) => {
