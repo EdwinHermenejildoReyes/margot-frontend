@@ -331,7 +331,7 @@ function CierreRow({
             {/* Link to daily detail */}
             <div className="border-t pt-2">
               <Link
-                href={`/dashboard/caja?fecha=${cierre.fecha}`}
+                href={`/dashboard/caja/historial/${cierre.id}`}
                 className="text-xs text-amber-700 hover:text-amber-900 font-medium"
               >
                 Ver detalle completo del día →

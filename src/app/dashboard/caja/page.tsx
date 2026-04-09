@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
@@ -102,9 +103,18 @@ function today(): string {
 }
 
 export default function CajaDiariaPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><LoadingSpinner /></div>}>
+      <CajaDiariaContent />
+    </Suspense>
+  );
+}
+
+function CajaDiariaContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const isSuperAdmin = user?.is_staff === true;
-  const [fecha, setFecha] = useState(today());
+  const [fecha, setFecha] = useState(searchParams.get("fecha") || today());
   const [data, setData] = useState<ResumenDia | null>(null);
   const [loading, setLoading] = useState(true);
 

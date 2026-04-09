@@ -637,3 +637,34 @@ export interface HistorialResponse {
     dias: number;
   };
 }
+
+export interface DetalleCierreResponse {
+  cierre: CierreCaja;
+  pedidos: {
+    id: number;
+    numero_pedido: string;
+    estado: string;
+    estado_display: string;
+    tipo_entrega: string;
+    tipo_entrega_display: string;
+    total: string;
+    total_items: number;
+    mesa_numero?: number | null;
+    metodo_pago?: { metodo: string; display: string } | null;
+    created_at: string;
+  }[];
+  productos_vendidos: { nombre: string; cantidad: number; ingreso: string }[];
+  resumen: {
+    total_pedidos: number;
+    total_ventas: string;
+    ventas_efectivo: string;
+    ventas_transferencia: string;
+    ventas_tarjeta: string;
+    monto_apertura: string;
+    total_gastos: string;
+    gastos_efectivo: string;
+    gastos_transferencia: string;
+    total_inversiones: string;
+    resultado: string;
+  };
+}

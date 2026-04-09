@@ -314,10 +314,11 @@ export default function NuevoPedidoPage() {
     if (promo.tipo === "adicional") return true;
     if (promo.tipo === "nxm") {
       const aplicaItems = promo.items?.filter((i) => i.rol === "aplica") || [];
-      // Need selection if: no items, multiple items (user must choose),
+      // No aplica items = promo is self-contained (e.g. "Michelada 2×1"), no selection needed
+      if (aplicaItems.length === 0) return false;
+      // Need selection if: multiple items (user must choose),
       // any item uses category, precio_filtro, or no menu_item
       if (
-        aplicaItems.length === 0 ||
         aplicaItems.length > 1 ||
         aplicaItems.some((i) => i.category || !i.menu_item || i.precio_filtro)
       ) return true;
