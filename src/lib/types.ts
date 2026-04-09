@@ -524,7 +524,18 @@ export interface GastoDiario {
   cantidad_insumo?: string | null;
   costo_unitario_insumo?: string | null;
   fecha_caducidad?: string | null;
+  subcategoria_servicio?: string | null;
+  subcategoria_servicio_display?: string | null;
+  fecha_pago?: string | null;
   created_at: string;
+  subcategoria_empaque?: string | null;
+  subcategoria_empaque_display?: string | null;
+  cantidad_empaque?: string | null;
+  subcategoria_limpieza?: string | null;
+  subcategoria_limpieza_display?: string | null;
+  cantidad_limpieza?: string | null;
+  empleado_nomina?: number | null;
+  empleado_nomina_nombre?: string | null;
 }
 
 export interface InversionSocio {

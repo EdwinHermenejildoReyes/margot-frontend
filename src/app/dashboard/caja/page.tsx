@@ -29,6 +29,7 @@ import {
   Pencil,
   History,
   Package,
+  SprayCan,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -36,6 +37,39 @@ import clsx from "clsx";
 const MEDIOS_PAGO_GASTO = [
   { value: "efectivo", label: "Efectivo" },
   { value: "transferencia", label: "Transferencia" },
+];
+
+const SUBCATEGORIAS_SERVICIO = [
+  { value: "internet", label: "Internet" },
+  { value: "arriendo", label: "Arriendo" },
+  { value: "agua", label: "Agua" },
+  { value: "luz", label: "Luz" },
+  { value: "gas", label: "Gas" },
+];
+
+// Define subcategories for Empaques
+const SUBCATEGORIAS_EMPAQUE = [
+  { value: "contenedor_5x5", label: "Contenedor 5x5" },
+  { value: "contenedor_9x5", label: "Contenedor 9x5" },
+  { value: "caja_hamburguesa_blanca", label: "Caja hamburguesa blanca" },
+  { value: "fundas_delivery_21", label: "Fundas de delivery número 21" },
+  { value: "fundas_delivery_29", label: "Fundas de delivery número 29" },
+  { value: "papel_termico", label: "Papel térmico" },
+  { value: "stickers", label: "Stickers" },
+  { value: "contenedor_redondo_tapa_transparente", label: "Contenedor redondo tapa transparente" },
+  { value: "contenedor_negro_tapa_transparente", label: "Contenedor negro tapa transparente" },
+];
+
+const SUBCATEGORIAS_LIMPIEZA = [
+  { value: "cloro", label: "Cloro" },
+  { value: "desengrasante", label: "Desengrasante" },
+  { value: "desinfectante", label: "Desinfectante" },
+  { value: "jabon_liquido", label: "Jabón líquido" },
+  { value: "esponja", label: "Esponja" },
+  { value: "alcohol", label: "Alcohol" },
+  { value: "limpion", label: "Limpión" },
+  { value: "papel_higienico", label: "Papel higiénico" },
+  { value: "toallas_de_tela", label: "Toallas de tela" },
 ];
 
 /* ── Estado badge colors ── */
@@ -90,6 +124,16 @@ export default function CajaDiariaPage() {
   const [gastoCategoria, setGastoCategoria] = useState<number>(0);
   const [gastoMedioPago, setGastoMedioPago] = useState("efectivo");
   const [gastoMonto, setGastoMonto] = useState("");
+  const [gastoSubcategoriaServicio, setGastoSubcategoriaServicio] = useState("");
+  const [gastoSubcategoriaEmpaque, setGastoSubcategoriaEmpaque] = useState("");
+  const [gastoCantidadEmpaque, setGastoCantidadEmpaque] = useState("");
+  const [gastoSubcategoriaLimpieza, setGastoSubcategoriaLimpieza] = useState("");
+  const [gastoCantidadLimpieza, setGastoCantidadLimpieza] = useState("");
+  const [gastoEmpleadoNomina, setGastoEmpleadoNomina] = useState<number | "">("")
+  const [gastoFechaPagoNomina, setGastoFechaPagoNomina] = useState("");
+  const [empleadosDisponibles, setEmpleadosDisponibles] = useState<{id: number; nombre: string}[]>([]);
+  const [gastoDescripcion, setGastoDescripcion] = useState("");
+  const [gastoFechaPago, setGastoFechaPago] = useState("");
   const [savingGasto, setSavingGasto] = useState(false);
 
   /* Insumos (vinculación con inventario) */
@@ -183,6 +227,11 @@ export default function CajaDiariaPage() {
   /* Derivar si la categoría seleccionada es "Insumos" */
   const selectedGastoCategoria = categoriasGasto.find(c => c.id === gastoCategoria);
   const isInsumoCategory = selectedGastoCategoria?.nombre?.toLowerCase().startsWith("insumo") ?? false;
+  const isServicioCategory = selectedGastoCategoria?.nombre?.toLowerCase().startsWith("servicio") ?? false;
+  const isEmpaqueCategory = selectedGastoCategoria?.nombre?.toLowerCase().startsWith("empaque") ?? false;
+  const isLimpiezaCategory = selectedGastoCategoria?.nombre?.toLowerCase().includes("limpieza") ?? false;
+  const isNominaCategory = (selectedGastoCategoria?.nombre?.toLowerCase().includes("nómina") || selectedGastoCategoria?.nombre?.toLowerCase().includes("personal")) ?? false;
+  const isOtrosCategory = selectedGastoCategoria?.nombre?.toLowerCase() === "otros";
 
   /* Cargar insumos, categorías y unidades cuando se elige "insumos" */
   useEffect(() => {
@@ -198,6 +247,21 @@ export default function CajaDiariaPage() {
         .catch(() => setUnidadesMedida([]));
     }
   }, [isInsumoCategory]);
+
+  /* Cargar empleados cuando se elige "Nómina/Personal" */
+  useEffect(() => {
+    if (isNominaCategory && empleadosDisponibles.length === 0) {
+      api.get(`/usuarios/?is_active=true&ordering=first_name&page_size=100`)
+        .then((res) => {
+          const users = res.data?.results ?? res.data ?? [];
+          setEmpleadosDisponibles(users.map((u: { id: number; first_name: string; last_name: string; username: string }) => ({
+            id: u.id,
+            nombre: `${u.first_name} ${u.last_name}`.trim() || u.username,
+          })));
+        })
+        .catch(() => setEmpleadosDisponibles([]));
+    }
+  }, [isNominaCategory]);
 
   /* Insumos filtrados por área seleccionada */
   const insumosFiltrados = insumos.filter(
@@ -319,9 +383,45 @@ export default function CajaDiariaPage() {
       }
     }
 
+    // Validar subcategoría si es Servicios
+    if (isServicioCategory && !gastoSubcategoriaServicio) {
+      toast.error("Seleccione el tipo de servicio");
+      return;
+    }
+
+    // Validar subcategoría si es Empaques
+    if (isEmpaqueCategory && !gastoSubcategoriaEmpaque) {
+      toast.error("Seleccione el tipo de empaque");
+      return;
+    }
+    if (isEmpaqueCategory && (!gastoCantidadEmpaque || Number(gastoCantidadEmpaque) <= 0)) {
+      toast.error("Ingrese la cantidad de empaques");
+      return;
+    }
+
+    // Validar subcategoría si es Limpieza
+    if (isLimpiezaCategory && !gastoSubcategoriaLimpieza) {
+      toast.error("Seleccione el producto de limpieza");
+      return;
+    }
+    if (isLimpiezaCategory && !gastoCantidadLimpieza) {
+      toast.error("Ingrese la cantidad o medida del producto");
+      return;
+    }
+
+    // Validar si es Nómina
+    if (isNominaCategory && !gastoEmpleadoNomina) {
+      toast.error("Seleccione el empleado");
+      return;
+    }
+
     // Auto-generar descripción
     const catLabel = selectedGastoCategoria?.nombre ?? "";
     let descripcion = catLabel;
+    if (isServicioCategory && gastoSubcategoriaServicio) {
+      const subLabel = SUBCATEGORIAS_SERVICIO.find(s => s.value === gastoSubcategoriaServicio)?.label ?? gastoSubcategoriaServicio;
+      descripcion = `${catLabel} — ${subLabel}`;
+    }
     if (isInsumoCategory && selectedInsumo) {
       if (isUnitBased) {
         descripcion = `${selectedInsumo.nombre} — ${unidades} cajas × ${pesoUnidad} und = ${cantidadEnBase} und`;
@@ -329,6 +429,21 @@ export default function CajaDiariaPage() {
         const pesoTotal = unidades * pesoUnidad;
         descripcion = `${selectedInsumo.nombre} — ${unidades} uds × ${pesoUnidad} ${unidadCompra} = ${pesoTotal.toFixed(2)} ${unidadCompra}`;
       }
+    }
+    if (isEmpaqueCategory && gastoSubcategoriaEmpaque) {
+      const subLabel = SUBCATEGORIAS_EMPAQUE.find(s => s.value === gastoSubcategoriaEmpaque)?.label ?? gastoSubcategoriaEmpaque;
+      descripcion = `${catLabel} — ${subLabel} x${gastoCantidadEmpaque}`;
+    }
+    if (isLimpiezaCategory && gastoSubcategoriaLimpieza) {
+      const subLabel = SUBCATEGORIAS_LIMPIEZA.find(s => s.value === gastoSubcategoriaLimpieza)?.label ?? gastoSubcategoriaLimpieza;
+      descripcion = `${catLabel} — ${subLabel} (${gastoCantidadLimpieza})`;
+    }
+    if (isNominaCategory && gastoEmpleadoNomina) {
+      const empNombre = empleadosDisponibles.find(e => e.id === gastoEmpleadoNomina)?.nombre ?? "Empleado";
+      descripcion = `${catLabel} — ${empNombre}`;
+    }
+    if (isOtrosCategory && gastoDescripcion.trim()) {
+      descripcion = `${catLabel} — ${gastoDescripcion.trim()}`;
     }
 
     setSavingGasto(true);
@@ -350,10 +465,33 @@ export default function CajaDiariaPage() {
       if (gastoFechaCaducidad) {
         payload.fecha_caducidad = gastoFechaCaducidad;
       }
+      if (isServicioCategory && gastoSubcategoriaServicio) {
+        payload.subcategoria_servicio = gastoSubcategoriaServicio;
+      }
+      if (isEmpaqueCategory && gastoSubcategoriaEmpaque) {
+        payload.subcategoria_empaque = gastoSubcategoriaEmpaque;
+        payload.cantidad_empaque = gastoCantidadEmpaque;
+      }
+      if (isLimpiezaCategory && gastoSubcategoriaLimpieza) {
+        payload.subcategoria_limpieza = gastoSubcategoriaLimpieza;
+        payload.cantidad_limpieza = gastoCantidadLimpieza;
+      }
+      if (isNominaCategory && gastoEmpleadoNomina) {
+        payload.empleado_nomina = gastoEmpleadoNomina;
+      }
+      if (gastoFechaPago) {
+        payload.fecha_pago = gastoFechaPago;
+      }
       await api.post("/gastos-diarios/", payload);
       toast.success(
         isInsumoCategory && gastoInsumo
           ? "Gasto registrado e inventario actualizado"
+          : isEmpaqueCategory
+          ? "Gasto registrado y stock de empaque actualizado"
+          : isLimpiezaCategory
+          ? "Gasto de limpieza registrado"
+          : isNominaCategory
+          ? "Pago de nómina registrado"
           : "Gasto registrado"
       );
       resetGastoForm();
@@ -376,6 +514,15 @@ export default function CajaDiariaPage() {
     setGastoPesoUnidad("");
     setGastoUnidadCompra("kg");
     setGastoFechaCaducidad("");
+    setGastoSubcategoriaServicio("");
+    setGastoFechaPago("");
+    setGastoSubcategoriaEmpaque("");
+    setGastoCantidadEmpaque("");
+    setGastoSubcategoriaLimpieza("");
+    setGastoCantidadLimpieza("");
+    setGastoEmpleadoNomina("");
+    setGastoFechaPagoNomina("");
+    setGastoDescripcion("");
     setCreandoInsumo(false);
     setNuevoInsumoNombre("");
     setNuevoInsumoCategoria("");
@@ -908,6 +1055,34 @@ export default function CajaDiariaPage() {
                           {g.costo_unitario_insumo && <> &middot; ${Number(g.costo_unitario_insumo).toFixed(4)}/{g.unidad_medida}</>}
                         </p>
                       )}
+                      {g.subcategoria_servicio && (
+                        <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
+                          <Receipt className="h-3 w-3" />
+                          {g.subcategoria_servicio_display || g.subcategoria_servicio}
+                          {g.fecha_pago && <> &middot; Pagado: {new Date(g.fecha_pago + "T00:00:00").toLocaleDateString("es-EC")}</>}
+                        </p>
+                      )}
+                      {g.subcategoria_empaque && (
+                        <p className="text-xs text-blue-600 mt-0.5 flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          {SUBCATEGORIAS_EMPAQUE.find(s => s.value === g.subcategoria_empaque)?.label || g.subcategoria_empaque}
+                          {g.cantidad_empaque && <> &middot; Cant: {Number(g.cantidad_empaque)}</>}
+                        </p>
+                      )}
+                      {g.subcategoria_limpieza && (
+                        <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1">
+                          <SprayCan className="h-3 w-3" />
+                          {SUBCATEGORIAS_LIMPIEZA.find(s => s.value === g.subcategoria_limpieza)?.label || g.subcategoria_limpieza}
+                          {g.cantidad_limpieza && <> &middot; {g.cantidad_limpieza}</>}
+                        </p>
+                      )}
+                      {g.empleado_nomina_nombre && (
+                        <p className="text-xs text-purple-600 mt-0.5 flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {g.empleado_nomina_nombre}
+                          {g.fecha_pago && <> &middot; Pagado: {new Date(g.fecha_pago + "T00:00:00").toLocaleDateString("es-EC")}</>}
+                        </p>
+                      )}
                       {g.fecha_caducidad && (
                         <p className={clsx(
                           "text-xs mt-0.5 flex items-center gap-1",
@@ -977,6 +1152,8 @@ export default function CajaDiariaPage() {
                       setGastoInsumo("");
                       setGastoUnidades("");
                       setGastoPesoUnidad("");
+                      setGastoSubcategoriaServicio("");
+                      setGastoFechaPago("");
                     }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
                   >
@@ -986,7 +1163,165 @@ export default function CajaDiariaPage() {
                   </select>
                 </div>
 
-                {/* 2. Si es Insumos: Área + Insumo + Detalles de compra */}
+                {/* 2a. Si es Servicios: Subcategoría + Fecha de pago */}
+                {isServicioCategory && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">
+                      <Receipt className="h-3.5 w-3.5" />
+                      Gasto Fijo
+                    </p>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Tipo de Servicio</label>
+                      <select
+                        value={gastoSubcategoriaServicio}
+                        onChange={(e) => setGastoSubcategoriaServicio(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                      >
+                        <option value="">— Seleccione servicio —</option>
+                        {SUBCATEGORIAS_SERVICIO.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Fecha de Pago</label>
+                      <input
+                        type="date"
+                        value={gastoFechaPago}
+                        onChange={(e) => setGastoFechaPago(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                      />
+                      {gastoFechaPago && (
+                        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Pago registrado: {new Date(gastoFechaPago + "T00:00:00").toLocaleDateString("es-EC", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2a-bis. Si es Empaques: Subcategoría + Cantidad */}
+                {isEmpaqueCategory && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-blue-700 flex items-center gap-1">
+                      <Package className="h-3.5 w-3.5" />
+                      Empaque / Utensilios
+                    </p>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Tipo de Empaque</label>
+                      <select
+                        value={gastoSubcategoriaEmpaque}
+                        onChange={(e) => setGastoSubcategoriaEmpaque(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                      >
+                        <option value="">— Seleccione empaque —</option>
+                        {SUBCATEGORIAS_EMPAQUE.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Cantidad</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={gastoCantidadEmpaque}
+                        onChange={(e) => setGastoCantidadEmpaque(e.target.value)}
+                        placeholder="Ej: 100"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 2a-ter. Si es Limpieza: Subcategoría + Cantidad/ml */}
+                {isLimpiezaCategory && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-green-700 flex items-center gap-1">
+                      <SprayCan className="h-3.5 w-3.5" />
+                      Producto de Limpieza
+                    </p>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Producto</label>
+                      <select
+                        value={gastoSubcategoriaLimpieza}
+                        onChange={(e) => setGastoSubcategoriaLimpieza(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                      >
+                        <option value="">— Seleccione producto —</option>
+                        {SUBCATEGORIAS_LIMPIEZA.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Cantidad / ml</label>
+                      <input
+                        type="text"
+                        value={gastoCantidadLimpieza}
+                        onChange={(e) => setGastoCantidadLimpieza(e.target.value)}
+                        placeholder="Ej: 2 galones, 500ml, 3 unidades"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 2a-quat. Si es Nómina/Personal: Empleado + Fecha de pago */}
+                {isNominaCategory && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-purple-700 flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" />
+                      Pago de Nómina
+                    </p>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Empleado</label>
+                      <select
+                        value={gastoEmpleadoNomina}
+                        onChange={(e) => setGastoEmpleadoNomina(e.target.value ? Number(e.target.value) : "")}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                      >
+                        <option value="">— Seleccione empleado —</option>
+                        {empleadosDisponibles.map((e) => (
+                          <option key={e.id} value={e.id}>{e.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Fecha de Pago</label>
+                      <input
+                        type="date"
+                        value={gastoFechaPagoNomina}
+                        onChange={(e) => { setGastoFechaPagoNomina(e.target.value); setGastoFechaPago(e.target.value); }}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                      />
+                      {gastoFechaPagoNomina && (
+                        <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Pago: {new Date(gastoFechaPagoNomina + "T00:00:00").toLocaleDateString("es-EC", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2a-quint. Si es Otros: Descripción libre */}
+                {isOtrosCategory && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Descripción</label>
+                    <input
+                      type="text"
+                      value={gastoDescripcion}
+                      onChange={(e) => setGastoDescripcion(e.target.value)}
+                      placeholder="Describa el gasto..."
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                    />
+                  </div>
+                )}
+
+                {/* 2b. Si es Insumos: Área + Insumo + Detalles de compra */}
                 {isInsumoCategory && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
                     <p className="text-xs font-semibold text-blue-700 flex items-center gap-1">
@@ -1090,7 +1425,7 @@ export default function CajaDiariaPage() {
                             <select
                               value={nuevoInsumoUnidad}
                               onChange={(e) => setNuevoInsumoUnidad(e.target.value)}
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 bg-white"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
                             >
                               <option value="">— Unidad —</option>
                               {unidadesMedida.map((u) => (
