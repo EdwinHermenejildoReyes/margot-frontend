@@ -289,7 +289,7 @@ export default function CosteoPage() {
               insumo_id: insumo.id,
               nombre: insumo.nombre,
               costo_unitario: parseFloat(insumo.costo_unitario),
-              unidad: insumo.unidad_abreviatura || "",
+              unidad: insumo.unidad || "",
             }
           : r
       )
@@ -600,7 +600,7 @@ export default function CosteoPage() {
                                   </span>
                                   <span className="text-xs text-gray-400 flex-shrink-0">
                                     ${fmt(parseFloat(insumo.costo_unitario))}{" "}
-                                    / {insumo.unidad_abreviatura}
+                                    / {insumo.unidad}
                                   </span>
                                 </button>
                               ))}
