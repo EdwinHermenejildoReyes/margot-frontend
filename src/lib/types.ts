@@ -278,6 +278,15 @@ export interface UnidadMedida {
   factor_conversion?: string;
 }
 
+export interface Proveedor {
+  id: number;
+  nombre: string;
+  ruc?: string;
+  telefono?: string;
+  email?: string;
+  contacto_nombre?: string;
+}
+
 export interface InventarioItem {
   id: number;
   nombre: string;
@@ -285,26 +294,38 @@ export interface InventarioItem {
   categoria_nombre?: string;
   categoria_area?: string;
   unidad_medida?: number;
-  unidad_abreviatura?: string;
   unidad?: string;
   stock_actual: string;
   stock_minimo: string;
   costo_unitario: string;
   perecedero: boolean;
   fecha_vencimiento?: string;
+  ubicacion_almacen?: string;
   proveedor_principal?: number;
   proveedor_nombre?: string;
-  alerta_stock?: boolean;
+  stock_bajo?: boolean;
+  valor_inventario?: string;
+  is_active?: boolean;
+  created_at?: string;
 }
+
+export type TipoMovimiento = "entrada" | "salida" | "ajuste_positivo" | "ajuste_negativo" | "merma";
 
 export interface MovimientoInventario {
   id: number;
   insumo: number;
   insumo_nombre?: string;
-  tipo: "entrada" | "salida" | "ajuste";
+  tipo: TipoMovimiento;
+  tipo_display?: string;
   cantidad: string;
-  fecha: string;
+  costo_unitario?: string;
+  costo_total?: string;
+  stock_anterior?: string;
+  stock_posterior?: string;
+  proveedor?: number;
+  referencia?: string;
   notas?: string;
+  fecha: string;
 }
 
 // ── Limpieza ──

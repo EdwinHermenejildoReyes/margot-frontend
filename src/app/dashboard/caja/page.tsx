@@ -156,6 +156,9 @@ function CajaDiariaContent() {
   const [gastoPesoUnidad, setGastoPesoUnidad] = useState("");
   const [gastoUnidadCompra, setGastoUnidadCompra] = useState("kg");
   const [gastoFechaCaducidad, setGastoFechaCaducidad] = useState("");
+  const [gastoDivisorPorcion, setGastoDivisorPorcion] = useState("");
+  const [gastoModoProduccion, setGastoModoProduccion] = useState(false);
+  const [gastoCantidadProduccion, setGastoCantidadProduccion] = useState("");
 
   /* Crear nuevo insumo inline */
   const [creandoInsumo, setCreandoInsumo] = useState(false);
@@ -288,19 +291,22 @@ function CajaDiariaContent() {
   const unidades = Number(gastoUnidades) || 0;
   const pesoUnidad = Number(gastoPesoUnidad) || 0;
   const unidadCompra = gastoUnidadCompra;
+  const divisorPorcion = Number(gastoDivisorPorcion) || 0;
 
-  // Para items por unidad: unidades (cajas) × cantidad por caja = total unidades
-  // Para items por peso: unidades × peso por unidad → conversión a base
   let cantidadEnBase = 0;
   let unidadBase = "";
   let totalDisplay = 0;
 
   if (selectedInsumo) {
     unidadBase = selectedInsumo.unidad ?? "";
-    if (isUnitBased) {
-      // Barra / unidades: cajas × unids_por_caja = total und
+    if (gastoModoProduccion) {
+      // Modo producción: el usuario ingresa las porciones resultantes directamente
+      cantidadEnBase = Number(gastoCantidadProduccion) || 0;
+      totalDisplay = cantidadEnBase;
+    } else if (isUnitBased) {
+      // Por unidades: cajas × unids_por_caja, con divisor opcional de porción
       totalDisplay = unidades * pesoUnidad;
-      cantidadEnBase = totalDisplay;
+      cantidadEnBase = divisorPorcion > 0 ? totalDisplay / divisorPorcion : totalDisplay;
     } else {
       const pesoTotal = unidades * pesoUnidad;
       totalDisplay = pesoTotal;
@@ -315,9 +321,11 @@ function CajaDiariaContent() {
       }
     }
   }
-  const porciones100 = !isUnitBased && (unidadBase === "g" || unidadBase === "ml")
-    ? Math.floor(cantidadEnBase / 100)
-    : 0;
+
+  // Para insumos por peso: porciones de 100g/ml (sin redondeo) y resto aprovechable
+  const esPorPeso = !isUnitBased && !gastoModoProduccion && (unidadBase === "g" || unidadBase === "ml");
+  const porciones100 = esPorPeso ? Math.floor(cantidadEnBase / 100) : 0;
+  const restoAprovechable = esPorPeso ? Math.round(cantidadEnBase % 100 * 1000) / 1000 : 0;
 
   /* ── Guardar / Crear cierre de caja ── */
   const handleSaveCaja = async () => {
@@ -383,13 +391,20 @@ function CajaDiariaContent() {
 
     // Si es insumo, validar que haya insumo seleccionado y datos de compra
     if (isInsumoCategory && gastoInsumo) {
-      if (!gastoUnidades || Number(gastoUnidades) <= 0) {
-        toast.error("Ingrese la cantidad de unidades compradas");
-        return;
-      }
-      if (!gastoPesoUnidad || Number(gastoPesoUnidad) <= 0) {
-        toast.error(isUnitBased ? "Ingrese las unidades por caja" : "Ingrese el peso por unidad");
-        return;
+      if (gastoModoProduccion) {
+        if (!gastoCantidadProduccion || Number(gastoCantidadProduccion) <= 0) {
+          toast.error("Ingrese la cantidad de porciones obtenidas");
+          return;
+        }
+      } else {
+        if (!gastoUnidades || Number(gastoUnidades) <= 0) {
+          toast.error("Ingrese la cantidad de unidades compradas");
+          return;
+        }
+        if (!gastoPesoUnidad || Number(gastoPesoUnidad) <= 0) {
+          toast.error(isUnitBased ? "Ingrese las unidades por caja/paquete" : "Ingrese el peso por unidad");
+          return;
+        }
       }
     }
 
@@ -433,8 +448,11 @@ function CajaDiariaContent() {
       descripcion = `${catLabel} — ${subLabel}`;
     }
     if (isInsumoCategory && selectedInsumo) {
-      if (isUnitBased) {
-        descripcion = `${selectedInsumo.nombre} — ${unidades} cajas × ${pesoUnidad} und = ${cantidadEnBase} und`;
+      if (gastoModoProduccion) {
+        descripcion = `${selectedInsumo.nombre} — producción: ${cantidadEnBase} ${unidadBase}`;
+      } else if (isUnitBased) {
+        const divPart = divisorPorcion > 0 ? ` ÷ ${divisorPorcion} = ${cantidadEnBase} porciones` : ` = ${cantidadEnBase} und`;
+        descripcion = `${selectedInsumo.nombre} — ${unidades} paquetes × ${pesoUnidad} und${divPart}`;
       } else {
         const pesoTotal = unidades * pesoUnidad;
         descripcion = `${selectedInsumo.nombre} — ${unidades} uds × ${pesoUnidad} ${unidadCompra} = ${pesoTotal.toFixed(2)} ${unidadCompra}`;
@@ -524,6 +542,9 @@ function CajaDiariaContent() {
     setGastoPesoUnidad("");
     setGastoUnidadCompra("kg");
     setGastoFechaCaducidad("");
+    setGastoDivisorPorcion("");
+    setGastoModoProduccion(false);
+    setGastoCantidadProduccion("");
     setGastoSubcategoriaServicio("");
     setGastoFechaPago("");
     setGastoSubcategoriaEmpaque("");
@@ -1372,6 +1393,9 @@ function CajaDiariaContent() {
                               setGastoInsumo(e.target.value);
                               setGastoUnidades("");
                               setGastoPesoUnidad("");
+                              setGastoDivisorPorcion("");
+                              setGastoModoProduccion(false);
+                              setGastoCantidadProduccion("");
                               // Auto-asignar unidad de compra según unidad del insumo
                               const ins = insumos.find((i) => i.id === Number(e.target.value));
                               if (ins) {
@@ -1472,36 +1496,89 @@ function CajaDiariaContent() {
                     {/* Detalles de compra (solo si insumo seleccionado) */}
                     {gastoInsumo && selectedInsumo && (
                       <div className="space-y-3">
-                        {isUnitBased ? (
-                          /* ── Compra por unidades (barra: cajas × und/caja) ── */
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">Cajas / paquetes</label>
-                              <input
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={gastoUnidades}
-                                onChange={(e) => setGastoUnidades(e.target.value)}
-                                placeholder="Ej: 2"
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
-                              />
+
+                        {/* Toggle modo producción (para frutas u otros con proceso) */}
+                        {!isUnitBased && (
+                          <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={gastoModoProduccion}
+                              onChange={(e) => {
+                                setGastoModoProduccion(e.target.checked);
+                                setGastoUnidades("");
+                                setGastoPesoUnidad("");
+                                setGastoCantidadProduccion("");
+                              }}
+                              className="rounded border-gray-300 text-brand-gold focus:ring-brand-gold"
+                            />
+                            <span className="text-gray-600 font-medium">Modo producción</span>
+                            <span className="text-gray-400">(ingreso manual de porciones resultantes)</span>
+                          </label>
+                        )}
+
+                        {gastoModoProduccion ? (
+                          /* ── Modo producción: el usuario ingresa las porciones que resultaron ── */
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">
+                              Porciones obtenidas <span className="text-gray-400">({unidadBase})</span>
+                            </label>
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="0.001"
+                              value={gastoCantidadProduccion}
+                              onChange={(e) => setGastoCantidadProduccion(e.target.value)}
+                              placeholder="Ej: 24"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Ingresa el resultado final del proceso (porciones congeladas, unidades procesadas, etc.)</p>
+                          </div>
+                        ) : isUnitBased ? (
+                          /* ── Compra por unidades: paquetes × und/paquete, con divisor opcional ── */
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-1">Cajas / paquetes</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  value={gastoUnidades}
+                                  onChange={(e) => setGastoUnidades(e.target.value)}
+                                  placeholder="Ej: 2"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-1">Unidades por paquete</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  value={gastoPesoUnidad}
+                                  onChange={(e) => setGastoPesoUnidad(e.target.value)}
+                                  placeholder="Ej: 50"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+                                />
+                              </div>
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Unidades por caja</label>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Agrupar de a <span className="text-gray-400">(divisor de porción, opcional)</span>
+                              </label>
                               <input
                                 type="number"
                                 min="1"
                                 step="1"
-                                value={gastoPesoUnidad}
-                                onChange={(e) => setGastoPesoUnidad(e.target.value)}
-                                placeholder="Ej: 24"
+                                value={gastoDivisorPorcion}
+                                onChange={(e) => setGastoDivisorPorcion(e.target.value)}
+                                placeholder="Ej: 5 para alitas (50 ÷ 5 = 10 porciones en stock)"
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
                               />
                             </div>
                           </div>
                         ) : (
-                          /* ── Compra por peso (cocina: unidades × peso × conversión) ── */
+                          /* ── Compra por peso: unidades × peso × conversión ── */
                           <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="block text-xs text-gray-500 mb-1">Unidades</label>
@@ -1523,7 +1600,7 @@ function CajaDiariaContent() {
                                 step="0.001"
                                 value={gastoPesoUnidad}
                                 onChange={(e) => setGastoPesoUnidad(e.target.value)}
-                                placeholder="Ej: 1.13"
+                                placeholder="Ej: 1.35"
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
                               />
                             </div>
@@ -1555,24 +1632,47 @@ function CajaDiariaContent() {
                         {/* Resumen de conversión */}
                         {cantidadEnBase > 0 && (
                           <div className="bg-white border border-blue-200 rounded-lg p-3 space-y-1.5">
-                            {isUnitBased ? (
+                            {gastoModoProduccion ? (
                               <p className="text-xs font-medium text-gray-700">
-                                Total: <span className="text-blue-700 font-bold">{unidades} {unidades === 1 ? "caja" : "cajas"} × {pesoUnidad} und = {cantidadEnBase} und</span>
+                                Stock a ingresar: <span className="text-blue-700 font-bold">{cantidadEnBase} {unidadBase}</span>
                               </p>
+                            ) : isUnitBased ? (
+                              <>
+                                <p className="text-xs font-medium text-gray-700">
+                                  Subtotal: <span className="text-gray-600">{unidades} paquetes × {pesoUnidad} und = {unidades * pesoUnidad} und</span>
+                                </p>
+                                {divisorPorcion > 0 ? (
+                                  <p className="text-xs font-medium text-emerald-700">
+                                    En stock: <span className="font-bold">{cantidadEnBase} porciones</span>
+                                    <span className="text-gray-400 font-normal"> ({unidades * pesoUnidad} und ÷ {divisorPorcion})</span>
+                                  </p>
+                                ) : (
+                                  <p className="text-xs font-medium text-blue-700">
+                                    En stock: <span className="font-bold">{cantidadEnBase} und</span>
+                                  </p>
+                                )}
+                              </>
                             ) : (
                               <>
                                 <p className="text-xs font-medium text-gray-700">
-                                  Peso total: <span className="text-blue-700 font-bold">{totalDisplay.toFixed(2)} {unidadCompra}</span>
-                                  {" "}({unidades} uds × {pesoUnidad} {unidadCompra})
+                                  Peso total: <span className="text-blue-700 font-bold">{totalDisplay.toFixed(3)} {unidadCompra}</span>
+                                  <span className="text-gray-400"> ({unidades} uds × {pesoUnidad} {unidadCompra})</span>
                                 </p>
-                                {cantidadEnBase > 0 && unidadBase !== unidadCompra && (
+                                {unidadBase !== unidadCompra && (
                                   <p className="text-xs text-gray-600">
-                                    Conversión: <span className="text-blue-700 font-bold">{cantidadEnBase.toFixed(1)} {unidadBase}</span>
+                                    En stock: <span className="text-blue-700 font-bold">{cantidadEnBase.toFixed(1)} {unidadBase}</span>
                                   </p>
                                 )}
                                 {porciones100 > 0 && (
                                   <p className="text-xs text-emerald-700 font-medium">
-                                    Porciones de 100{unidadBase}: <span className="font-bold">{porciones100}</span> porciones
+                                    Porciones de 100{unidadBase}: <span className="font-bold">{porciones100}</span>
+                                    <span className="font-normal"> (sin redondeo)</span>
+                                  </p>
+                                )}
+                                {restoAprovechable > 0 && (
+                                  <p className="text-xs text-amber-600 font-medium">
+                                    Resto aprovechable: <span className="font-bold">{restoAprovechable}{unidadBase}</span>
+                                    <span className="font-normal"> (válido para porciones menores)</span>
                                   </p>
                                 )}
                               </>
@@ -1612,7 +1712,7 @@ function CajaDiariaContent() {
                   </select>
                 </div>
 
-                {/* 5. Fecha de caducidad (opcional) */}
+                {/* 5. Fecha de caducidad */}
                 {isInsumoCategory && (
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">

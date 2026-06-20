@@ -2,7 +2,15 @@
 
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
-import type { InventarioItem, PaginatedResponse } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/permissions";
+import type {
+  InventarioItem,
+  MovimientoInventario,
+  CategoriaInsumo,
+  UnidadMedida,
+  Proveedor,
+} from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
   Package,
@@ -12,12 +20,20 @@ import {
   DollarSign,
   ChevronLeft,
   ChevronRight,
-  Filter,
+  Edit2,
+  X,
+  History,
+  MapPin,
+  Calendar,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
+
 export default function InventarioPage() {
+  const { user } = useAuth();
+  const puedeEditar = canManage(user, "inventario");
+
   const [items, setItems] = useState<InventarioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -26,13 +42,16 @@ export default function InventarioPage() {
   const [filterView, setFilterView] = useState<"all" | "stock_bajo" | "por_vencer">("all");
   const [resumen, setResumen] = useState({ total_items: 0, valor_total_inventario: 0, items_stock_bajo: 0 });
 
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventarioItem | null>(null);
+  const [historialItem, setHistorialItem] = useState<InventarioItem | null>(null);
+
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
       let url = "/inventario/";
       const params: Record<string, string | number> = { page };
       if (search) params.search = search;
-
       if (filterView === "stock_bajo") url = "/inventario/stock_bajo/";
       else if (filterView === "por_vencer") url = "/inventario/por_vencer/";
 
@@ -51,30 +70,39 @@ export default function InventarioPage() {
     }
   }, [page, search, filterView]);
 
-  const fetchResumen = async () => {
+  const fetchResumen = useCallback(async () => {
     try {
       const { data } = await api.get("/inventario/resumen/");
       setResumen(data);
     } catch { /* ignore */ }
-  };
+  }, []);
 
-  useEffect(() => { fetchResumen(); }, []);
+  useEffect(() => { fetchResumen(); }, [fetchResumen]);
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
   const totalPages = Math.ceil(totalCount / 20);
 
+  const handleSaved = () => {
+    setShowItemModal(false);
+    setEditingItem(null);
+    fetchItems();
+    fetchResumen();
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Inventario</h1>
-        <p className="text-xs sm:text-sm text-gray-500 mt-1">{totalCount} insumos registrados</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Inventario</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">{totalCount} insumos registrados</p>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
-          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center gap-1 sm:gap-4">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
             <Package className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
           </div>
           <div className="text-center sm:text-left">
@@ -82,8 +110,8 @@ export default function InventarioPage() {
             <p className="text-lg sm:text-xl font-bold text-gray-900">{resumen.total_items}</p>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
-          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-green-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center gap-1 sm:gap-4">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
             <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
           </div>
           <div className="text-center sm:text-left">
@@ -91,8 +119,8 @@ export default function InventarioPage() {
             <p className="text-base sm:text-xl font-bold text-gray-900">${resumen.valor_total_inventario.toFixed(2)}</p>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-4">
-          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-red-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-4 flex flex-col sm:flex-row items-center gap-1 sm:gap-4">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
             <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
           </div>
           <div className="text-center sm:text-left">
@@ -149,45 +177,67 @@ export default function InventarioPage() {
         </div>
       ) : (
         <>
-          {/* ═══ DESKTOP TABLE ═══ */}
+          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/50">
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Insumo</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Categoría</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Stock</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Mínimo</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
-                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                    <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">Insumo</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Stock</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Mínimo</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ubicación</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                    {puedeEditar && <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {items.map((item) => {
                     const stockBajo = parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo);
+                    const hoy = new Date();
+                    const vencimiento = item.fecha_vencimiento ? new Date(item.fecha_vencimiento) : null;
+                    const porVencer = vencimiento && (vencimiento.getTime() - hoy.getTime()) < 7 * 86400000;
                     return (
-                      <tr key={item.id} className={clsx("hover:bg-gray-50/50 transition-colors", stockBajo && "bg-red-50/50")}>
-                        <td className="px-6 py-4">
+                      <tr key={item.id} className={clsx("hover:bg-gray-50/50 transition-colors", stockBajo && "bg-red-50/30")}>
+                        <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
-                            <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center", stockBajo ? "bg-red-100" : "bg-blue-100")}>
+                            <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", stockBajo ? "bg-red-100" : "bg-blue-100")}>
                               <Package className={clsx("h-4 w-4", stockBajo ? "text-red-600" : "text-blue-600")} />
                             </div>
                             <div>
-                              <span className="text-sm font-medium text-gray-900">{item.nombre}</span>
-                              {item.proveedor_nombre && <p className="text-xs text-gray-400">{item.proveedor_nombre}</p>}
+                              <p className="text-sm font-medium text-gray-900">{item.nombre}</p>
+                              {item.categoria_nombre && <p className="text-xs text-gray-400">{item.categoria_nombre}</p>}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.categoria_nombre || "—"}</td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-3 text-right">
                           <span className={clsx("text-sm font-semibold", stockBajo ? "text-red-600" : "text-gray-900")}>
-                            {item.stock_actual} {item.unidad_abreviatura || ""}
+                            {item.stock_actual} <span className="text-xs text-gray-400">{item.unidad}</span>
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-500">{item.stock_minimo}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-900">${item.costo_unitario}</td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 py-3 text-right text-sm text-gray-500">{item.stock_minimo}</td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-900">${item.costo_unitario}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {vencimiento ? (
+                            <span className={clsx("flex items-center gap-1", porVencer ? "text-orange-600 font-medium" : "text-gray-500")}>
+                              <Calendar className="h-3.5 w-3.5" />
+                              {vencimiento.toLocaleDateString("es-EC")}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {item.ubicacion_almacen ? (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                              {item.ubicacion_almacen}
+                            </span>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
                           {stockBajo ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                               <AlertTriangle className="h-3 w-3" /> Bajo
@@ -196,6 +246,26 @@ export default function InventarioPage() {
                             <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
                           )}
                         </td>
+                        {puedeEditar && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => setHistorialItem(item)}
+                                title="Ver historial"
+                                className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <History className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => { setEditingItem(item); setShowItemModal(true); }}
+                                title="Editar insumo"
+                                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -204,47 +274,67 @@ export default function InventarioPage() {
             </div>
           </div>
 
-          {/* ═══ MOBILE CARDS ═══ */}
+          {/* Mobile Cards */}
           <div className="md:hidden space-y-2">
             {items.map((item) => {
               const stockBajo = parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo);
+              const vencimiento = item.fecha_vencimiento ? new Date(item.fecha_vencimiento) : null;
               return (
                 <div
                   key={item.id}
                   className={clsx(
-                    "bg-white rounded-xl border p-3 transition-all",
+                    "bg-white rounded-xl border p-3 space-y-2",
                     stockBajo ? "border-red-200 bg-red-50/30" : "border-gray-200"
                   )}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0", stockBajo ? "bg-red-100" : "bg-blue-100")}>
+                      <div className={clsx("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", stockBajo ? "bg-red-100" : "bg-blue-100")}>
                         <Package className={clsx("h-4 w-4", stockBajo ? "text-red-600" : "text-blue-600")} />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{item.nombre}</p>
-                        <p className="text-[11px] text-gray-400">
-                          {item.categoria_nombre || "Sin categoría"}
-                          {item.proveedor_nombre ? ` · ${item.proveedor_nombre}` : ""}
-                        </p>
+                        <p className="text-[11px] text-gray-400">{item.categoria_nombre || "Sin categoría"}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
                       <span className={clsx("text-sm font-bold", stockBajo ? "text-red-600" : "text-gray-900")}>
-                        {item.stock_actual} {item.unidad_abreviatura || ""}
+                        {item.stock_actual} {item.unidad}
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-gray-400">mín: {item.stock_minimo}</span>
-                        {stockBajo ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
-                            <AlertTriangle className="h-2.5 w-2.5" /> Bajo
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">OK</span>
-                        )}
-                      </div>
+                      {stockBajo ? (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
+                          <AlertTriangle className="h-2.5 w-2.5" /> Bajo
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">OK</span>
+                      )}
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                    <span>Mín: {item.stock_minimo}</span>
+                    <span>•</span>
+                    <span>${item.costo_unitario}/{item.unidad}</span>
+                    {vencimiento && <span className="text-orange-500 flex items-center gap-0.5"><Calendar className="h-3 w-3" />{vencimiento.toLocaleDateString("es-EC")}</span>}
+                    {item.ubicacion_almacen && <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{item.ubicacion_almacen}</span>}
+                  </div>
+
+                  {puedeEditar && (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => setHistorialItem(item)}
+                        className="flex-1 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium flex items-center justify-center gap-1"
+                      >
+                        <History className="h-3.5 w-3.5" /> Historial
+                      </button>
+                      <button
+                        onClick={() => { setEditingItem(item); setShowItemModal(true); }}
+                        className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -264,6 +354,353 @@ export default function InventarioPage() {
           </button>
         </div>
       )}
+
+      {/* Modals */}
+      {showItemModal && (
+        <InventarioItemModal
+          item={editingItem}
+          onClose={() => { setShowItemModal(false); setEditingItem(null); }}
+          onSaved={handleSaved}
+        />
+      )}
+      {historialItem && (
+        <HistorialModal
+          item={historialItem}
+          onClose={() => setHistorialItem(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal: Crear / Editar Insumo ───────────────────────────────────────────
+
+function InventarioItemModal({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: InventarioItem | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [categorias, setCategorias] = useState<CategoriaInsumo[]>([]);
+  const [unidades, setUnidades] = useState<UnidadMedida[]>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [loadingOpts, setLoadingOpts] = useState(true);
+
+  const [form, setForm] = useState({
+    nombre: item?.nombre || "",
+    categoria_insumo: item?.categoria_insumo ?? "",
+    unidad_medida: item?.unidad_medida ?? "",
+    stock_minimo: item?.stock_minimo || "0",
+    proveedor_principal: item?.proveedor_principal ?? "",
+    perecedero: item?.perecedero ?? false,
+    fecha_vencimiento: item?.fecha_vencimiento || "",
+    ubicacion_almacen: item?.ubicacion_almacen || "",
+    // Solo para creación: stock inicial (dispara un movimiento de entrada)
+    stock_inicial: "",
+    referencia_inicial: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const loadOpts = async () => {
+      try {
+        const [catRes, unidRes, provRes] = await Promise.all([
+          api.get("/categorias-insumo/"),
+          api.get("/unidades-medida/"),
+          api.get("/proveedores/"),
+        ]);
+        setCategorias(catRes.data.results || catRes.data);
+        setUnidades(unidRes.data.results || unidRes.data);
+        setProveedores(provRes.data.results || provRes.data);
+      } catch {
+        toast.error("Error al cargar opciones");
+      } finally {
+        setLoadingOpts(false);
+      }
+    };
+    loadOpts();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.unidad_medida) { toast.error("Selecciona una unidad de medida"); return; }
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        nombre: form.nombre,
+        unidad_medida: form.unidad_medida,
+        stock_minimo: form.stock_minimo,
+        perecedero: form.perecedero,
+        ubicacion_almacen: form.ubicacion_almacen || null,
+        fecha_vencimiento: form.perecedero && form.fecha_vencimiento ? form.fecha_vencimiento : null,
+      };
+      if (form.categoria_insumo) payload.categoria_insumo = form.categoria_insumo;
+      if (form.proveedor_principal) payload.proveedor_principal = form.proveedor_principal;
+
+      let insumoId: number;
+      if (item) {
+        await api.patch(`/inventario/${item.id}/`, payload);
+        toast.success("Insumo actualizado");
+        insumoId = item.id;
+      } else {
+        const { data } = await api.post("/inventario/", payload);
+        insumoId = data.id;
+        // Si se especificó stock inicial, crear un movimiento de entrada
+        if (form.stock_inicial && parseFloat(form.stock_inicial) > 0) {
+          await api.post("/movimientos-inventario/", {
+            insumo: insumoId,
+            tipo: "entrada",
+            cantidad: form.stock_inicial,
+            proveedor: form.proveedor_principal || null,
+            referencia: form.referencia_inicial || null,
+            notas: "Stock inicial",
+          });
+        }
+        toast.success("Insumo creado");
+      }
+      onSaved();
+    } catch {
+      toast.error("Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
+          <h2 className="text-lg font-semibold">{item ? "Editar Insumo" : "Nuevo Insumo"}</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
+        </div>
+
+        {loadingOpts ? (
+          <div className="p-8 flex justify-center"><LoadingSpinner /></div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            {/* Nombre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del insumo *</label>
+              <input
+                required
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                placeholder="Ej: Harina de trigo"
+                className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+              />
+            </div>
+
+            {/* Categoría + Unidad de medida */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                <select
+                  value={form.categoria_insumo}
+                  onChange={(e) => setForm({ ...form, categoria_insumo: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                >
+                  <option value="">Sin categoría</option>
+                  {categorias.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre} ({c.area})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Unidad de medida *</label>
+                <select
+                  required
+                  value={form.unidad_medida}
+                  onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                >
+                  <option value="">Seleccionar...</option>
+                  {unidades.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nombre} ({u.abreviatura}) — {u.tipo}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Stock mínimo + Proveedor */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stock mínimo</label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={form.stock_minimo}
+                  onChange={(e) => setForm({ ...form, stock_minimo: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor principal</label>
+                <select
+                  value={form.proveedor_principal}
+                  onChange={(e) => setForm({ ...form, proveedor_principal: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                >
+                  <option value="">Sin proveedor</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Ubicación */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación en almacén</label>
+              <input
+                value={form.ubicacion_almacen}
+                onChange={(e) => setForm({ ...form, ubicacion_almacen: e.target.value })}
+                placeholder="Ej: Refrigerador 1, Estante A3, Barra"
+                className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+              />
+            </div>
+
+            {/* Perecedero + Fecha vencimiento */}
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.perecedero}
+                  onChange={(e) => setForm({ ...form, perecedero: e.target.checked, fecha_vencimiento: "" })}
+                  className="rounded border-gray-300 text-brand-gold focus:ring-brand-gold"
+                />
+                <span className="font-medium text-gray-700">Producto perecedero</span>
+              </label>
+              {form.perecedero && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de vencimiento</label>
+                  <input
+                    type="date"
+                    value={form.fecha_vencimiento}
+                    onChange={(e) => setForm({ ...form, fecha_vencimiento: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Stock inicial (solo al crear) */}
+            {!item && (
+              <div className="border-t pt-4 space-y-3">
+                <p className="text-sm font-medium text-gray-700">Stock inicial <span className="text-gray-400 font-normal">(opcional)</span></p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Cantidad</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={form.stock_inicial}
+                      onChange={(e) => setForm({ ...form, stock_inicial: e.target.value })}
+                      placeholder="0"
+                      className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Referencia / Factura</label>
+                    <input
+                      value={form.referencia_inicial}
+                      onChange={(e) => setForm({ ...form, referencia_inicial: e.target.value })}
+                      placeholder="Nro. factura"
+                      className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 px-4 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button type="submit" disabled={saving} className="flex-1 py-2.5 px-4 rounded-lg bg-brand-gold text-white text-sm font-medium hover:bg-brand-bronze disabled:opacity-50">
+                {saving ? "Guardando..." : item ? "Actualizar" : "Crear insumo"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: Historial de movimientos ────────────────────────────────────────
+
+function HistorialModal({
+  item,
+  onClose,
+}: {
+  item: InventarioItem;
+  onClose: () => void;
+}) {
+  const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/movimientos-inventario/", { params: { insumo: item.id, ordering: "-fecha" } })
+      .then(({ data }) => setMovimientos(data.results || data))
+      .catch(() => toast.error("Error al cargar historial"))
+      .finally(() => setLoading(false));
+  }, [item.id]);
+
+  const tipoColor: Record<string, string> = {
+    entrada: "bg-green-100 text-green-800",
+    salida: "bg-red-100 text-red-800",
+    ajuste_positivo: "bg-blue-100 text-blue-800",
+    ajuste_negativo: "bg-orange-100 text-orange-800",
+    merma: "bg-gray-100 text-gray-700",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div>
+            <h2 className="text-lg font-semibold">Historial de movimientos</h2>
+            <p className="text-sm text-gray-500">{item.nombre} · Stock: {item.stock_actual} {item.unidad}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-4 space-y-2">
+          {loading ? (
+            <LoadingSpinner />
+          ) : movimientos.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">Sin movimientos registrados</p>
+          ) : (
+            movimientos.map((m) => (
+              <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={clsx("px-2 py-0.5 rounded-full text-xs font-medium", tipoColor[m.tipo] || "bg-gray-100 text-gray-700")}>
+                      {m.tipo_display || m.tipo}
+                    </span>
+                    {m.referencia && <span className="text-xs text-gray-400 truncate">{m.referencia}</span>}
+                  </div>
+                  {m.notas && <p className="text-xs text-gray-500 truncate">{m.notas}</p>}
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {new Date(m.fecha).toLocaleString("es-EC")}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-semibold text-gray-900">{m.cantidad} {item.unidad}</p>
+                  {m.stock_posterior && (
+                    <p className="text-xs text-gray-400">→ {m.stock_posterior}</p>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
