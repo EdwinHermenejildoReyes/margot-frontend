@@ -184,6 +184,10 @@ function CajaDiariaContent() {
   const [closingCaja, setClosingCaja] = useState(false);
   const [showConfirmCierre, setShowConfirmCierre] = useState(false);
 
+  /* Confirmación eliminar gasto */
+  const [gastoToDelete, setGastoToDelete] = useState<number | null>(null);
+  const [deletingGasto, setDeletingGasto] = useState(false);
+
   /* Catálogos dinámicos */
   const [categoriasGasto, setCategoriasGasto] = useState<CategoriaGasto[]>([]);
   const [socios, setSocios] = useState<SocioCatalog[]>([]);
@@ -606,13 +610,18 @@ function CajaDiariaContent() {
   };
 
   /* ── Eliminar gasto ── */
-  const handleDeleteGasto = async (gastoId: number) => {
+  const handleDeleteGasto = async () => {
+    if (gastoToDelete === null) return;
+    setDeletingGasto(true);
     try {
-      await api.delete(`/gastos-diarios/${gastoId}/`);
+      await api.delete(`/gastos-diarios/${gastoToDelete}/`);
       toast.success("Gasto eliminado");
+      setGastoToDelete(null);
       fetchData();
     } catch {
       toast.error("Error al eliminar gasto");
+    } finally {
+      setDeletingGasto(false);
     }
   };
 
@@ -1139,7 +1148,7 @@ function CajaDiariaContent() {
                       </span>
                       <span className="text-sm font-semibold text-red-600">${fmt(g.monto)}</span>
                       <button
-                        onClick={() => handleDeleteGasto(g.id)}
+                        onClick={() => setGastoToDelete(g.id)}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Eliminar gasto"
                         disabled={cajaCerrada}
@@ -2266,6 +2275,40 @@ function CajaDiariaContent() {
           </div>
         )}
       </div>
+
+      {/* Confirmación eliminar gasto */}
+      {gastoToDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Eliminar gasto</h3>
+                <p className="text-sm text-gray-500">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">¿Estás seguro de que deseas eliminar este gasto?</p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setGastoToDelete(null)}
+                disabled={deletingGasto}
+                className="flex-1 py-2.5 px-4 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteGasto}
+                disabled={deletingGasto}
+                className="flex-1 py-2.5 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingGasto ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

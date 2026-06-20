@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Edit2,
+  Trash2,
   X,
   History,
   MapPin,
@@ -45,6 +46,8 @@ export default function InventarioPage() {
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventarioItem | null>(null);
   const [historialItem, setHistorialItem] = useState<InventarioItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<InventarioItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -87,6 +90,22 @@ export default function InventarioPage() {
     setEditingItem(null);
     fetchItems();
     fetchResumen();
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/inventario/${deletingItem.id}/`);
+      toast.success("Insumo eliminado");
+      setDeletingItem(null);
+      fetchItems();
+      fetchResumen();
+    } catch {
+      toast.error("Error al eliminar insumo");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -263,6 +282,13 @@ export default function InventarioPage() {
                               >
                                 <Edit2 className="h-4 w-4" />
                               </button>
+                              <button
+                                onClick={() => setDeletingItem(item)}
+                                title="Eliminar insumo"
+                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </td>
                         )}
@@ -333,6 +359,12 @@ export default function InventarioPage() {
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
+                      <button
+                        onClick={() => setDeletingItem(item)}
+                        className="px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-xs font-medium"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -368,6 +400,40 @@ export default function InventarioPage() {
           item={historialItem}
           onClose={() => setHistorialItem(null)}
         />
+      )}
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Eliminar insumo</h3>
+                <p className="text-sm text-gray-500">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">
+              ¿Estás seguro de que deseas eliminar <span className="font-medium">{deletingItem.nombre}</span>?
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setDeletingItem(null)}
+                disabled={deleting}
+                className="flex-1 py-2.5 px-4 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteItem}
+                disabled={deleting}
+                className="flex-1 py-2.5 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
