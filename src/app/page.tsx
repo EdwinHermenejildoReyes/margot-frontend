@@ -583,9 +583,15 @@ export default function LandingPage() {
                 <span className="text-primary">Margot</span> Food & Drinks
               </span>
             </div>
-            <p className="text-neutral-dark text-sm">
-              &copy; {new Date().getFullYear()} Margot Restobar. Todos los derechos reservados.
-            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-3 text-sm text-neutral-dark">
+              <p>&copy; {new Date().getFullYear()} Margot Restobar. Todos los derechos reservados.</p>
+              <span className="hidden sm:inline">·</span>
+              <div className="flex gap-3">
+                <Link href="/privacidad" className="hover:text-primary transition-colors">Privacidad</Link>
+                <span>·</span>
+                <Link href="/terminos" className="hover:text-primary transition-colors">Términos</Link>
+              </div>
+            </div>
           </div>
         </div>
       </footer>

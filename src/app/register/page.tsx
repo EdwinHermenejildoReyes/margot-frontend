@@ -101,6 +101,13 @@ export default function RegisterPage() {
               </select>
             </div>
 
+            <p className="text-xs text-gray-500 text-center">
+              Al registrarte aceptas nuestros{" "}
+              <Link href="/terminos" className="text-brand-gold hover:underline">Términos y Condiciones</Link>
+              {" "}y nuestra{" "}
+              <Link href="/privacidad" className="text-brand-gold hover:underline">Política de Privacidad</Link>.
+            </p>
+
             <button type="submit" disabled={loading} className="w-full py-2.5 px-4 rounded-lg bg-brand-gold text-white font-medium text-sm hover:bg-brand-bronze disabled:opacity-50 transition-colors">
               {loading ? "Creando cuenta..." : "Registrarse"}
             </button>
