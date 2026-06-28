@@ -210,6 +210,7 @@ export interface Mesa {
   capacidad: number;
   estado: string;
   ubicacion: string;
+  qr_token: string;
   pos_x?: number;
   pos_y?: number;
 }

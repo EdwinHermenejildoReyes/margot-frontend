@@ -7,7 +7,8 @@ import { canManage } from "@/lib/permissions";
 import type { Mesa, Atencion, Pedido, PaginatedResponse } from "@/lib/types";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil, DoorOpen, Banknote, ArrowRightLeft, CreditCard } from "lucide-react";
+import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil, DoorOpen, Banknote, ArrowRightLeft, CreditCard, QrCode } from "lucide-react";
+import QRCode from "react-qr-code";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -31,6 +32,7 @@ export default function MesasPage() {
   const [liberando, setLiberando] = useState<number | null>(null);
   const [liberarModal, setLiberarModal] = useState<number | null>(null);
   const [liberarPedidos, setLiberarPedidos] = useState<Pedido[]>([]);
+  const [qrMesa, setQrMesa] = useState<Mesa | null>(null);
 
   const fetchMesas = async () => {
     try {
@@ -183,6 +185,13 @@ export default function MesasPage() {
                   <Users className="h-3 w-3" /> {mesa.capacidad}
                 </div>
                 <StatusBadge status={mesa.estado} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setQrMesa(mesa); }}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-gold transition-colors"
+                title="Ver código QR"
+              >
+                <QrCode className="h-3.5 w-3.5" /> QR
               </button>
               {atencion && (
                 <div className="mt-2 space-y-2">
@@ -361,6 +370,33 @@ export default function MesasPage() {
             await fetchPedidosPorAtenciones(ats);
           }}
         />
+      )}
+
+      {/* QR Code Modal */}
+      {qrMesa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setQrMesa(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Mesa {qrMesa.numero} — Código QR</h2>
+              <button onClick={() => setQrMesa(null)} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="flex justify-center p-4 bg-white border-2 border-gray-100 rounded-xl mb-4" id="qr-print-area">
+              <QRCode
+                value={`https://margot.rest/mesa/${qrMesa.qr_token}`}
+                size={200}
+                fgColor="#1a1a2e"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mb-1">Escanea para pedir desde tu mesa</p>
+            <p className="text-xs font-mono text-gray-400 mb-4 break-all">{qrMesa.qr_token}</p>
+            <button
+              onClick={() => window.print()}
+              className="w-full py-2.5 px-4 rounded-lg bg-brand-gold text-white text-sm font-medium hover:bg-brand-bronze transition-colors"
+            >
+              Imprimir QR
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
