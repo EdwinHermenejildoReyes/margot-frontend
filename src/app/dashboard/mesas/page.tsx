@@ -9,6 +9,7 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { Armchair, Users, Plus, Clock, X, ShoppingCart, Pencil, DoorOpen, Banknote, ArrowRightLeft, CreditCard, QrCode } from "lucide-react";
 import QRCode from "react-qr-code";
+import config from "@/lib/config";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -382,7 +383,7 @@ export default function MesasPage() {
             </div>
             <div className="flex justify-center p-4 bg-white border-2 border-gray-100 rounded-xl mb-4" id="qr-print-area">
               <QRCode
-                value={`https://margot.rest/mesa/${qrMesa.qr_token}`}
+                value={`${config.PUBLIC_URL}/mesa/${qrMesa.qr_token}`}
                 size={200}
                 fgColor="#1a1a2e"
               />
