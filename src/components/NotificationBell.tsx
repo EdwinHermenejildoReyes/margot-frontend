@@ -12,6 +12,7 @@ import {
   Package,
   UtensilsCrossed,
   AlertTriangle,
+  ShoppingBag,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
@@ -23,6 +24,7 @@ import { es } from "date-fns/locale";
 import toast from "react-hot-toast";
 
 const ICON_MAP: Record<string, typeof Bell> = {
+  nuevo_pedido: ShoppingBag,
   pedido_confirmado: ClipboardCheck,
   pedido_en_preparacion: ChefHat,
   pedido_listo: UtensilsCrossed,
@@ -34,6 +36,7 @@ const ICON_MAP: Record<string, typeof Bell> = {
 };
 
 const COLOR_MAP: Record<string, string> = {
+  nuevo_pedido: "bg-brand-gold/10 text-brand-gold",
   pedido_confirmado: "bg-blue-100 text-blue-600",
   pedido_en_preparacion: "bg-amber-100 text-amber-600",
   pedido_listo: "bg-green-100 text-green-600",
