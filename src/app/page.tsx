@@ -201,7 +201,7 @@ export default function LandingPage() {
       <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
         {/* Background image */}
         <Image
-          src="/fondo_margot.png"
+          src="/fondo_margot.webp"
           alt=""
           fill
           className="object-cover opacity-25"
