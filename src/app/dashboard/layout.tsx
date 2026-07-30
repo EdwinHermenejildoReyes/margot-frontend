@@ -41,6 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
+      <meta name="robots" content="noindex,nofollow" />
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Navbar />
