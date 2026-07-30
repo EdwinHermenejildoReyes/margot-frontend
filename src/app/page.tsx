@@ -445,11 +445,11 @@ export default function LandingPage() {
                     value={comentario}
                     onChange={(e) => setComentario(e.target.value)}
                     placeholder="Cuéntanos qué te pareció..."
-                    maxLength={500}
+                    maxLength={750}
                     rows={3}
                     className="w-full bg-white/10 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-neutral-dark focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors resize-none"
                   />
-                  <p className="text-xs text-neutral-dark mt-1 text-right">{comentario.length}/500</p>
+                  <p className="text-xs text-neutral-dark mt-1 text-right">{comentario.length}/750</p>
                 </div>
 
                 <button
