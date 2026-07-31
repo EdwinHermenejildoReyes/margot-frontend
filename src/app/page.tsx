@@ -30,6 +30,13 @@ interface MenuItemPublic {
   es_destacado: boolean;
 }
 
+interface RankingData {
+  mas_pedidos: MenuItemPublic[];
+  favoritos: MenuItemPublic[];
+  cocteles: MenuItemPublic[];
+  destacados: MenuItemPublic[];
+}
+
 interface CategoriaPublic {
   id: number;
   nombre: string;
@@ -115,6 +122,8 @@ export default function LandingPage() {
   const [resenas, setResenas] = useState<ResenaPublic[]>([]);
   const [contacto, setContacto] = useState<ContactoPublic>(DEFAULT_CONTACTO);
   const [loadingMenu, setLoadingMenu] = useState(true);
+  const [ranking, setRanking] = useState<RankingData | null>(null);
+  const [activeTab, setActiveTab] = useState<"mas_pedidos" | "favoritos" | "cocteles" | "destacados">("mas_pedidos");
 
   /* Reseña form */
   const [nombre, setNombre] = useState("");
@@ -128,12 +137,14 @@ export default function LandingPage() {
       fetch(`${base}/public/menu/landing/`).then((r) => r.json()).catch(() => []),
       fetch(`${base}/public/resenas/`).then((r) => r.json()).catch(() => ({ results: [] })),
       fetch(`${base}/public/info/contacto/`).then((r) => r.json()).catch(() => ({})),
-    ]).then(([menuData, resenasData, contactoData]) => {
+      fetch(`${base}/public/menu/ranking/`).then((r) => r.json()).catch(() => null),
+    ]).then(([menuData, resenasData, contactoData, rankingData]) => {
       setMenu(menuData);
       setResenas(Array.isArray(resenasData) ? resenasData : resenasData.results || []);
       if (contactoData && Object.keys(contactoData).length > 0) {
         setContacto({ ...DEFAULT_CONTACTO, ...contactoData });
       }
+      if (rankingData) setRanking(rankingData);
       setLoadingMenu(false);
     });
   }, []);
@@ -381,6 +392,117 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+
+      {/* ═══ RANKING ═══ */}
+      {ranking && (
+        <section id="ranking" className="py-24 bg-dark-deep">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-12">
+              <span className="text-primary text-sm font-semibold uppercase tracking-widest">Lo más popular</span>
+              <h2 className="text-4xl sm:text-5xl font-bold mt-3">
+                Ranking de <span className="text-primary">platos</span>
+              </h2>
+              <p className="text-neutral-dark mt-4 max-w-xl mx-auto">
+                Los favoritos de nuestra cocina, elegidos por nuestros clientes.
+              </p>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex justify-center gap-2 mb-10 flex-wrap">
+              {(
+                [
+                  { key: "mas_pedidos", label: "Más pedidos", emoji: "🔥" },
+                  { key: "favoritos", label: "Favoritos", emoji: "❤️" },
+                  { key: "cocteles", label: "Cócteles", emoji: "🍹" },
+                  { key: "destacados", label: "Destacados", emoji: "⭐" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={clsx(
+                    "px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border",
+                    activeTab === tab.key
+                      ? "bg-primary text-dark border-primary shadow-lg shadow-primary/20"
+                      : "bg-white/5 text-neutral border-white/10 hover:border-primary/40 hover:bg-white/10"
+                  )}
+                >
+                  {tab.emoji} {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Cards */}
+            {(() => {
+              const items = ranking[activeTab];
+              if (!items || items.length === 0) {
+                return (
+                  <p className="text-center text-neutral-dark py-12">
+                    Pronto habrá datos para esta categoría. ¡Visítanos!
+                  </p>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {items.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-primary/40 transition-all hover:shadow-lg hover:shadow-primary/10"
+                    >
+                      {/* Rank badge */}
+                      <div className="absolute top-3 left-3 z-10 w-8 h-8 bg-dark/80 backdrop-blur-sm rounded-full flex items-center justify-center text-sm font-bold text-primary border border-primary/30">
+                        {idx + 1}
+                      </div>
+                      {item.es_destacado && (
+                        <div className="absolute top-3 right-3 z-10 bg-primary/90 text-dark text-xs font-bold px-2 py-0.5 rounded-full">
+                          Destacado
+                        </div>
+                      )}
+
+                      {/* Image */}
+                      <div className="relative h-44 bg-dark">
+                        {item.imagen ? (
+                          <img
+                            src={item.imagen}
+                            alt={item.nombre}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Utensils className="w-10 h-10 text-neutral-dark/40" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-bold text-white text-lg leading-tight">{item.nombre}</h3>
+                          <span className="text-primary font-bold whitespace-nowrap">${item.precio}</span>
+                        </div>
+                        {item.descripcion && (
+                          <p className="text-sm text-neutral-dark mt-2 line-clamp-2">{item.descripcion}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <div className="text-center mt-10">
+              <Link
+                href="/menu"
+                className="inline-flex items-center gap-2 bg-primary hover:bg-secondary text-dark px-8 py-3.5 rounded-xl font-bold transition-colors"
+              >
+                <Utensils className="w-5 h-5" />
+                Ver menú completo
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ═══ RESEÑAS ═══ */}
       <section id="resenas" className="py-24 bg-dark-deep">
