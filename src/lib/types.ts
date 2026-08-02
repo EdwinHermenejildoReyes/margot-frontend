@@ -143,6 +143,8 @@ export interface Promocion {
   tipo_display: string;
   is_active: boolean;
   vigente: boolean;
+  imagen?: string | null;
+  imagen_banner?: string | null;
   precio_promocional?: string;
   precio_extra?: string;
   cantidad_requerida?: number;

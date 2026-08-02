@@ -28,6 +28,7 @@ import {
   DollarSign,
   Package,
   Minus,
+  ImageIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -190,6 +191,17 @@ export default function PromocionesPage() {
               key={promo.id}
               className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow group"
             >
+              {/* Imagen banner */}
+              {(promo.imagen_banner || promo.imagen) && (
+                <div className="relative h-36 bg-gray-100 overflow-hidden">
+                  <img
+                    src={(promo.imagen_banner || promo.imagen) as string}
+                    alt={promo.nombre}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
               {/* Header bar */}
               <div
                 className={clsx(
@@ -394,6 +406,10 @@ function PromocionModal({
 
   const [items, setItems] = useState<PromocionItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [imagenFile, setImagenFile] = useState<File | null>(null);
+  const [imagenPreview, setImagenPreview] = useState<string | null>(null);
+  const [imagenBannerFile, setImagenBannerFile] = useState<File | null>(null);
+  const [imagenBannerPreview, setImagenBannerPreview] = useState<string | null>(null);
 
   /* ── Populate form when detail loads ── */
   useEffect(() => {
@@ -422,6 +438,8 @@ function PromocionModal({
         precio_filtro: i.precio_filtro || undefined,
       }))
     );
+    if (detail.imagen) setImagenPreview(detail.imagen);
+    if (detail.imagen_banner) setImagenBannerPreview(detail.imagen_banner);
   }, [detail]);
 
   /* ── Item helpers ── */
@@ -459,8 +477,7 @@ function PromocionModal({
         is_active: form.is_active,
         cantidad_requerida:
           form.cantidad_requerida ? Number(form.cantidad_requerida) : null,
-        precio_promocional:
-          form.precio_promocional || null,
+        precio_promocional: form.precio_promocional || null,
         precio_extra: form.precio_extra || null,
         fecha_inicio: form.fecha_inicio || null,
         fecha_fin: form.fecha_fin || null,
@@ -473,13 +490,28 @@ function PromocionModal({
         })),
       };
 
+      let savedId: number;
       if (isEdit && promo) {
         await api.put(`/promociones/${promo.id}/`, payload);
+        savedId = promo.id;
         toast.success("Promoción actualizada");
       } else {
-        await api.post("/promociones/", payload);
+        const { data } = await api.post<{ id: number }>("/promociones/", payload);
+        savedId = data.id;
         toast.success("Promoción creada");
       }
+
+      if (imagenFile) {
+        const fd = new FormData();
+        fd.append("imagen", imagenFile);
+        await api.patch(`/promociones/${savedId}/`, fd);
+      }
+      if (imagenBannerFile) {
+        const fd = new FormData();
+        fd.append("imagen_banner", imagenBannerFile);
+        await api.patch(`/promociones/${savedId}/`, fd);
+      }
+
       onSaved();
     } catch {
       toast.error("Error al guardar la promoción");
@@ -546,6 +578,81 @@ function PromocionModal({
               className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
               placeholder="Describe la promoción..."
             />
+          </div>
+
+          {/* Imágenes */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Imagen app móvil */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Imagen app <span className="text-gray-400 font-normal">(800×400 px)</span>
+              </label>
+              {imagenPreview ? (
+                <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                  <img src={imagenPreview} alt="App preview" className="w-full h-28 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImagenFile(null); setImagenPreview(null); }}
+                    className="absolute top-1.5 right-1.5 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors">
+                  <ImageIcon className="h-6 w-6 text-gray-300 mb-1" />
+                  <span className="text-xs text-gray-400">Subir imagen app</span>
+                  <span className="text-xs text-gray-300">JPG/PNG · máx 5MB</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setImagenFile(file);
+                      setImagenPreview(URL.createObjectURL(file));
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Imagen banner dashboard */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Imagen dashboard <span className="text-gray-400 font-normal">(800×320 px)</span>
+              </label>
+              {imagenBannerPreview ? (
+                <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                  <img src={imagenBannerPreview} alt="Banner preview" className="w-full h-28 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImagenBannerFile(null); setImagenBannerPreview(null); }}
+                    className="absolute top-1.5 right-1.5 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors">
+                  <ImageIcon className="h-6 w-6 text-gray-300 mb-1" />
+                  <span className="text-xs text-gray-400">Subir imagen dashboard</span>
+                  <span className="text-xs text-gray-300">JPG/PNG · máx 5MB</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setImagenBannerFile(file);
+                      setImagenBannerPreview(URL.createObjectURL(file));
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Tipo + Activa */}
