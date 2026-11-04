@@ -26,6 +26,7 @@ import {
   History,
   MapPin,
   Calendar,
+  ArrowUpDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
@@ -46,6 +47,7 @@ export default function InventarioPage() {
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventarioItem | null>(null);
   const [historialItem, setHistorialItem] = useState<InventarioItem | null>(null);
+  const [ajusteItem, setAjusteItem] = useState<InventarioItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventarioItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -276,6 +278,13 @@ export default function InventarioPage() {
                                 <History className="h-4 w-4" />
                               </button>
                               <button
+                                onClick={() => setAjusteItem(item)}
+                                title="Ajustar stock"
+                                className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              >
+                                <ArrowUpDown className="h-4 w-4" />
+                              </button>
+                              <button
                                 onClick={() => { setEditingItem(item); setShowItemModal(true); }}
                                 title="Editar insumo"
                                 className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
@@ -354,6 +363,13 @@ export default function InventarioPage() {
                         <History className="h-3.5 w-3.5" /> Historial
                       </button>
                       <button
+                        onClick={() => setAjusteItem(item)}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-medium"
+                        title="Ajustar stock"
+                      >
+                        <ArrowUpDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button
                         onClick={() => { setEditingItem(item); setShowItemModal(true); }}
                         className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium"
                       >
@@ -399,6 +415,13 @@ export default function InventarioPage() {
         <HistorialModal
           item={historialItem}
           onClose={() => setHistorialItem(null)}
+        />
+      )}
+      {ajusteItem && (
+        <AjusteStockModal
+          item={ajusteItem}
+          onClose={() => setAjusteItem(null)}
+          onSaved={() => { setAjusteItem(null); fetchItems(); fetchResumen(); }}
         />
       )}
       {deletingItem && (
@@ -693,6 +716,162 @@ function InventarioItemModal({
             </div>
           </form>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: Ajuste de stock ─────────────────────────────────────────────────
+
+function AjusteStockModal({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: InventarioItem;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    tipo: "ajuste_positivo" as "ajuste_positivo" | "ajuste_negativo",
+    cantidad: "",
+    notas: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const stockActual = parseFloat(item.stock_actual);
+  const cantidad = parseFloat(form.cantidad) || 0;
+  const stockResultante = form.tipo === "ajuste_positivo"
+    ? stockActual + cantidad
+    : stockActual - cantidad;
+  const stockNegativo = form.cantidad !== "" && stockResultante < 0;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.cantidad || cantidad <= 0) { toast.error("Ingresa una cantidad válida"); return; }
+    if (stockNegativo) { toast.error("El stock no puede quedar negativo"); return; }
+    setSaving(true);
+    try {
+      await api.post("/movimientos-inventario/", {
+        insumo: item.id,
+        tipo: form.tipo,
+        cantidad: form.cantidad,
+        notas: form.notas || null,
+      });
+      toast.success("Stock ajustado correctamente");
+      onSaved();
+    } catch (err: unknown) {
+      const res = (err as { response?: { data?: Record<string, string[]> } })?.response?.data;
+      const msg = res?.non_field_errors?.[0] || res?.detail?.[0] || "Error al ajustar stock";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div>
+            <h2 className="text-lg font-semibold">Ajustar stock</h2>
+            <p className="text-sm text-gray-500">{item.nombre}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100"><X className="h-5 w-5" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Stock actual */}
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <p className="text-xs text-gray-500 mb-0.5">Stock actual</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {item.stock_actual} <span className="text-sm font-normal text-gray-400">{item.unidad}</span>
+            </p>
+          </div>
+
+          {/* Tipo */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, tipo: "ajuste_positivo" })}
+              className={clsx(
+                "py-2.5 rounded-xl text-sm font-medium border-2 transition-colors",
+                form.tipo === "ajuste_positivo"
+                  ? "border-green-500 bg-green-50 text-green-700"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300"
+              )}
+            >
+              + Entrada
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, tipo: "ajuste_negativo" })}
+              className={clsx(
+                "py-2.5 rounded-xl text-sm font-medium border-2 transition-colors",
+                form.tipo === "ajuste_negativo"
+                  ? "border-orange-500 bg-orange-50 text-orange-700"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300"
+              )}
+            >
+              − Salida
+            </button>
+          </div>
+
+          {/* Cantidad */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad <span className="text-gray-400 font-normal">({item.unidad})</span>
+            </label>
+            <input
+              required
+              type="number"
+              step="0.001"
+              min="0.001"
+              value={form.cantidad}
+              onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
+              placeholder="0"
+              className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none"
+            />
+          </div>
+
+          {/* Preview resultado */}
+          {form.cantidad && cantidad > 0 && (
+            <div className={clsx("rounded-xl p-3 text-center text-sm", stockNegativo ? "bg-red-50" : "bg-blue-50")}>
+              <span className="text-gray-500">Resultado: </span>
+              <span className={clsx("font-bold", stockNegativo ? "text-red-600" : "text-blue-700")}>
+                {stockResultante.toFixed(3)} {item.unidad}
+              </span>
+              {stockNegativo && <p className="text-xs text-red-500 mt-0.5">El stock no puede quedar negativo</p>}
+            </div>
+          )}
+
+          {/* Notas */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notas <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <textarea
+              rows={2}
+              value={form.notas}
+              onChange={(e) => setForm({ ...form, notas: e.target.value })}
+              placeholder="Motivo del ajuste..."
+              className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-brand-gold focus:outline-none resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 px-4 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || stockNegativo}
+              className="flex-1 py-2.5 px-4 rounded-lg bg-brand-gold text-white text-sm font-medium hover:bg-brand-bronze disabled:opacity-50"
+            >
+              {saving ? "Guardando..." : "Confirmar"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
